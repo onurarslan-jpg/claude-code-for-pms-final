@@ -171,6 +171,56 @@ decline-penalty framing.
   directly-affected responders (Vesper, Meteor Mite). The CSV is the
   least-filtered source for "how bad is it, really."
 
+### Root-cause mechanism, confirmed in code (session 3 — "Rewind")
+
+Read the actual routing code (`00-rook/code/dispatch-routing/`). Ranking
+score = 0.60·proximity + 0.25·recent-acceptance + 0.15·capability
+(proximity was 0.45, recent-acceptance was 0.40, before 4.2). Two things
+compound into a one-way trap for anyone pushed low: (1) a timeout is scored
+identically to an active decline (`history.py: record_declined` fires on
+`NO_ANSWER` too); (2) the recent-acceptance score never decays back toward
+neutral on its own — open TODO since 2019, still unresolved — it only moves
+via `record_accepted`, which requires actually landing an offer inside the
+60s window. Combined: fewer offers → fewer chances to earn the score back →
+any rare offer is more likely to time out anyway → score drops further,
+permanently. The only ways a "gone quiet" responder gets pinged again: a
+very close incident (proximity can override a bad score), the whole
+higher-ranked candidate list declining first, a handler's manual routing
+override (exists since 4.0, logged — see `06-sidekicks/briefs/
+routing-override-audit-log.txt`), or an engineering/config change. Nothing
+in the system recovers this on its own.
+
+Same mechanism explains the aggregate recovery: self-sorting pulls
+reliable/fast responders to the top over time, cutting wasted cascade
+hops — why acceptance rate climbed 54%→66%→67%→73% with zero code changes
+shipped after 4.2 (checked the changelog, nothing post-4.2). Behavioral
+adaptation helped too — Aunt Dot's interview: she now tells Vesper's
+partner to keep the phone in his pocket rather than upstairs, to beat the
+60s window.
+
+### Season vs. release (session 3)
+
+Total weekly callout volume was flat-to-peak right through release week
+(177 sent, the highest in the file) and only dropped starting the week
+after — timing argues against Priya's "mostly seasonal" read being the main
+driver. Also can't be pure seasonal demand softening, since that wouldn't
+create winners — it's redistribution (winner cluster rising while loser
+cluster collapses), not a uniform dip. The CSV only covers one season/one
+year, so it can't confirm or refute "August is always soft" as a general
+claim either way.
+
+### New data-integrity anomaly: Nightwell (session 3)
+
+Same pattern as the Ironvale anomaly, but starker. Three tickets (T-004,
+T-009, T-011 — both Nightwell and her handler Marjorie Sung) say she's
+getting almost nothing, filed during the exact weeks her CSV row shows her
+as the single highest-volume, highest-accepting responder in the whole
+dataset (16→18→20→21 sent/week, rising every week). Neither she nor her
+handler has any way to see the backend record themselves. Likely a
+device/notification-delivery issue (e.g. a stale second session answering
+silently), not a routing problem — a Marcus/engineering question, separate
+from the Wen Li ranking question.
+
 ### First-month framing (my own call, not something to re-litigate each session)
 
 Decided not to make the 4.2 aftermath my sole focus. Running roughly in
