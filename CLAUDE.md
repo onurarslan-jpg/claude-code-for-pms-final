@@ -221,6 +221,35 @@ device/notification-delivery issue (e.g. a stale second session answering
 silently), not a routing problem — a Marcus/engineering question, separate
 from the Wen Li ranking question.
 
+### Routing mechanics, spelled out further (session 4 — "X-Ray Vision")
+
+Proximity scoring is a linear falloff, not a flat pass/fail: `1.0 − (travel_minutes /
+45)`, zero at 45 minutes or beyond. Two responders both "within range" can score very
+differently — 5 minutes out and 40 minutes out are not treated the same. Capability
+match is the unaccounted-for 15% in the 0.60/0.25 proximity/acceptance split
+(`WEIGHT_CAPABILITY_MATCH = 0.15`) — unchanged since 4.0, not touched by 4.2.
+
+Confirmed mechanically (not just inferred): there is no reset or migration logic
+anywhere in `history.py`/`config.py`. A responder's recent-acceptance score carries
+straight across a release boundary with no adjustment, so the 4.2 reweight applied
+immediately to whatever score everyone already had — including responders who were
+already low going in. Marcus asked exactly this on 14 Aug ("was that meant to apply
+to responders who've been turning jobs down too, or only everyone else?") and never
+got an answer — Wen Li said she'd look after PTO (back the 24th) and the thread
+never picks it back up. Still open; drafted a message to send her, not yet sent.
+
+Also asked Wen Li (not yet sent): how responder location/travel-time actually gets
+retrieved for proximity scoring, which device/data source, how often it updates.
+`availability.py`'s `available_for()`, `travel_time_minutes()`, and `current_record()`
+are all unimplemented stubs — nothing in this repo documents the location pipeline,
+so I can't independently verify whether the four "gone quiet" responders (Farlight,
+Meteor Mite, Undertow, Vesper) were also just geographically unlucky versus it being
+pure score collapse. Leaning toward score collapse, not geography: the four moved in
+a synchronized, monotonically-worsening pattern starting the week after 4.2 (not the
+noisy up-and-down you'd expect from geographic luck), and Kip's interview has Meteor
+Mite and The Gale — same handler, same city, same weeks — moving in opposite
+directions, which argues against "no nearby incidents" as the explanation.
+
 ### First-month framing (my own call, not something to re-litigate each session)
 
 Decided not to make the 4.2 aftermath my sole focus. Running roughly in
