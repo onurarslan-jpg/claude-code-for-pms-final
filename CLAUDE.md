@@ -250,6 +250,54 @@ noisy up-and-down you'd expect from geographic luck), and Kip's interview has Me
 Mite and The Gale — same handler, same city, same weeks — moving in opposite
 directions, which argues against "no nearby incidents" as the explanation.
 
+### "Standing" proposal for Helen (session 5 — "Super Speed")
+
+Helen asked for the alternative to changing a constant: engineering can fix Mite's
+number this afternoon, she doesn't want it quietly flipped, and she wants it from the
+point of view of the person it happens to. Deliverables: `05-super-speed/brief.md`
+(one-pager) and `05-super-speed/prototype.html` (clickable, single file, offline).
+
+The proposal is three pieces: (1) **standing in plain words** on the handler card with
+the reason, (2) a **guaranteed look** — two weeks under threshold and Dispatch sends the
+next suitable callout regardless of rank, at 90s not 60s, (3) **tell the responder** on
+their phone. Piece 1 ships first and carries most of the value; Dot's "I don't need to
+do anything about it, I'd just like to know" is the evidence it stands alone.
+
+Position taken, decided and not to be re-litigated: **ship the timeout/decline
+arithmetic fix immediately and decoupled** from all of this. An earlier draft held it
+hostage to the bigger proposal, which was me protecting the proposal over the product.
+
+Things found while building it that are worth keeping:
+
+- **Delivery confirmation is the prerequisite, not a nice-to-have.** `push_to_device()`
+  returns nothing, so Dispatch knows only that it *sent*. Every "N offers reached you"
+  is a claim the system can't make. If Nightwell/Ironvale are delivery faults, standing
+  shows them a well-designed lie. Marcus first, before any of this is worth building.
+- **Capping the busiest responder does not help the quietest one.** Throttling The Gale
+  cascades the overflow to the next-ranked high-standing responders (Falkirk,
+  Stormwrack, Vantage, Nightwell); Meteor Mite at 14th of 16 gets +0. Only something
+  that overrides ranking reaches Mite. The intuitive fix silently fails — worth having
+  ready, because it's the first thing anyone proposes.
+- **The catchable week was 10 Aug, not 17 Aug.** Mite's acceptance collapsed first
+  (10 offers / 4 taken) while offer volume still looked normal; the volume crash came a
+  week later. Nothing on the console changes when only acceptance moves, so the early
+  warning exists in the data but not on any screen.
+- **My own threshold flags 4 of 16 at once** (Farlight, Meteor Mite, Undertow, Vesper).
+  That's a second routing policy, not a safety valve; contention between competing
+  guaranteed looks is undefined.
+- **A guaranteed look is taken from the incident** (+12–28 min travel, +90s before
+  cascade) and I costed it at zero. It also lowers acceptance rate on purpose — Ravi's
+  headline weekly number — so it needs a segmented metric or an explicit agreement.
+  The 90s also partially reverses a committed 4.2 decision, so it's Helen's call.
+- **"The next callout he can do" isn't expressible.** `capability_score` is partial
+  credit, `rank_for_callout` never filters ("Nobody is removed here"), callouts carry no
+  severity field. Needs a data-model change, not a config change.
+
+**Meteor Mite has no pronoun in any source.** Kip says "Mite thinks Mite's been
+forgotten" — the name twice, never "he" or "she" — and cover identity isn't stored or
+derivable. Use the name. Earlier drafts of mine invented "he"; that's been corrected in
+both deliverables. Vesper *is* "he" — Aunt Dot uses it throughout her interview.
+
 ### First-month framing (my own call, not something to re-litigate each session)
 
 Decided not to make the 4.2 aftermath my sole focus. Running roughly in
