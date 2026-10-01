@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rook Dispatch — Standing (prototype)</title>
+<style>
+  :root{
+    --bg:#11151c; --panel:#171d26; --panel2:#1d2530; --line:#28323f;
+    --ink:#e6ecf3; --dim:#8c9bad; --dimmer:#6b7a8c;
+    --ok:#4ea87a; --warn:#d4a24c; --bad:#cf6a5a; --accent:#5b8fd6;
+  }
+  html[data-theme="light"]{
+    --bg:#f4f6f8; --panel:#ffffff; --panel2:#f0f3f6; --line:#d9e0e8;
+    --ink:#16202b; --dim:#5d6b7a; --dimmer:#8494a4;
+    --ok:#2f7f56; --warn:#a97a1e; --bad:#b04a3a; --accent:#2f68b0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  header{border-bottom:1px solid var(--line);padding:14px 22px;
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--panel)}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.2px}
+  header .sub{color:var(--dim);font-size:13px}
+  .spacer{flex:1}
+  button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--ink);padding:6px 12px}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button:disabled{opacity:.4;cursor:default}
+  nav{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+  nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;
+    color:var(--dim);padding:10px 14px}
+  nav button.on{color:var(--ink);border-bottom-color:var(--accent)}
+  main{padding:22px;max-width:1120px;margin:0 auto}
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    padding:12px 14px;border-radius:6px;color:var(--dim);font-size:13.5px;margin-bottom:20px}
+  .note b{color:var(--ink)}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:820px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .card .top{padding:14px 16px;border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:10px}
+  .card .top h2{margin:0;font-size:17px}
+  .card .top .who{color:var(--dimmer);font-size:12.5px}
+  .card .body{padding:16px}
+  .stat{display:flex;justify-content:space-between;padding:7px 0;
+    border-bottom:1px dashed var(--line);font-size:14px}
+  .stat:last-child{border-bottom:0}
+  .stat span:first-child{color:var(--dim)}
+  .big{font-size:30px;font-weight:600;letter-spacing:-.5px}
+  .bad{color:var(--bad)} .ok{color:var(--ok)} .warn{color:var(--warn)}
+  .spark{display:flex;align-items:flex-end;gap:4px;height:56px;margin:14px 0 6px}
+  .spark i{flex:1;background:var(--accent);opacity:.75;border-radius:2px 2px 0 0;min-height:2px}
+  .spark i.after{background:var(--dim)}
+  .spark i.hot{background:var(--ok)}
+  .spark i.cold{background:var(--bad)}
+  .axis{display:flex;justify-content:space-between;color:var(--dimmer);font-size:11px}
+  .standing{margin-top:14px;padding:13px 14px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line)}
+  .standing.low{border-color:var(--bad)}
+  .standing h3{margin:0 0 6px;font-size:12px;letter-spacing:.7px;text-transform:uppercase;color:var(--dim)}
+  .standing p{margin:0 0 8px;font-size:14px}
+  .meter{height:7px;border-radius:4px;background:var(--line);overflow:hidden;margin:9px 0}
+  .meter i{display:block;height:100%;border-radius:4px}
+  .why{font-size:13px;color:var(--dim);margin:8px 0 0}
+  .shrug{color:var(--dimmer);font-style:italic;font-size:13.5px;
+    border:1px dashed var(--line);border-radius:8px;padding:13px 14px;margin-top:14px}
+  .phone{max-width:330px;margin:0 auto;background:var(--panel);border:1px solid var(--line);
+    border-radius:26px;padding:16px;box-shadow:0 10px 34px rgba(0,0,0,.28)}
+  .phone .bar{display:flex;justify-content:space-between;color:var(--dimmer);
+    font-size:11px;margin-bottom:14px}
+  .phone h2{margin:0 0 3px;font-size:19px}
+  .phone .cover{color:var(--dimmer);font-size:12px;margin-bottom:16px}
+  .quiet{text-align:center;padding:52px 12px;color:var(--dimmer)}
+  .quiet .z{font-size:30px;opacity:.5}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+  @media(max-width:820px){.two{grid-template-columns:1fr}}
+  .lbl{font-size:12px;letter-spacing:.7px;text-transform:uppercase;color:var(--dim);
+    margin:0 0 10px;font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:500;font-size:12px}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr.now{background:var(--panel2)}
+  .log{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .ev{padding:10px 0;border-bottom:1px dashed var(--line);font-size:14px;display:flex;gap:12px}
+  .ev:last-child{border-bottom:0}
+  .ev .w{color:var(--dimmer);font-size:12px;min-width:62px;padding-top:2px}
+  .ev.gain{color:var(--ok)} .ev.loss{color:var(--bad)}
+  .ctl{display:flex;gap:10px;align-items:center;margin:16px 0}
+  .pill{display:inline-block;font-size:11px;letter-spacing:.5px;text-transform:uppercase;
+    padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+  .pill.bad{border-color:var(--bad);color:var(--bad)}
+  .pill.ok{border-color:var(--ok);color:var(--ok)}
+  h3.sec{font-size:15px;margin:26px 0 10px}
+  ul.tight{margin:8px 0 0;padding-left:20px;color:var(--dim);font-size:13.5px}
+  ul.tight li{margin-bottom:5px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12.5px}
+  footer{color:var(--dimmer);font-size:12.5px;padding:26px 22px;max-width:1120px;margin:0 auto;
+    border-top:1px solid var(--line)}
+  .bigtype{font-size:19px;line-height:1.45}
+  .bigtype .top h2{font-size:26px}
+  .bigtype .top .who{font-size:15px}
+  .bigtype .stat{font-size:19px;padding:11px 0}
+  .bigtype .standing h3{font-size:15px}
+  .bigtype .standing p{font-size:19px}
+  .bigtype .why{font-size:17px}
+  .bigtype .glance{font-size:23px;font-weight:600;line-height:1.3;margin:0 0 4px}
+  .bigtype .axis{font-size:14px}
+  .bigtype .spark{height:74px}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;
+    align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50}
+  .overlay.on{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    max-width:620px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+  .modal .mtop{padding:16px 20px;border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:10px}
+  .modal .mtop h2{margin:0;font-size:18px}
+  .modal .mtop .who{color:var(--dimmer);font-size:12.5px}
+  .modal .mbody{padding:20px}
+  .modal .mfoot{padding:14px 20px;border-top:1px solid var(--line);
+    display:flex;gap:10px;justify-content:flex-end}
+  .modal h4{margin:18px 0 7px;font-size:12px;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--dim)}
+  .modal h4:first-child{margin-top:0}
+  .modal p{margin:0 0 9px;font-size:14px}
+  .x{margin-left:auto;background:none;border:0;color:var(--dim);font-size:20px;
+    line-height:1;padding:0 4px;cursor:pointer}
+  .cost{border:1px solid var(--bad);border-radius:8px;padding:12px 14px;background:var(--panel2)}
+  .cost .stat{font-size:13.5px}
+  .open{margin-top:18px;border-left:3px solid var(--warn);padding:10px 12px;
+    background:var(--panel2);border-radius:0 6px 6px 0}
+  .open p{font-size:13px;color:var(--dim);margin:0 0 6px}
+  .open p:last-child{margin-bottom:0}
+  .open b{color:var(--warn)}
+  .caps{display:flex;gap:8px;margin:10px 0 4px;flex-wrap:wrap}
+  .caps button.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+  .formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:11px 13px;
+    color:var(--dim);line-height:1.7}
+  .formula b{color:var(--ink)}
+  .mhead{display:flex;align-items:center;gap:14px;border:1px solid var(--line);
+    background:var(--panel);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .mhead h2{margin:0 0 3px;font-size:19px}
+  .mhead .who{color:var(--dimmer);font-size:12.5px}
+  .mhead .pill{margin-left:auto}
+  .weekstrip{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .weekstrip button{flex:1;min-width:72px;padding:8px 4px;border-radius:7px;
+    display:flex;flex-direction:column;gap:3px;align-items:center;line-height:1.25}
+  .weekstrip button .wk{font-size:11px;color:var(--dimmer)}
+  .weekstrip button .vol{font-size:15px;font-weight:600}
+  .weekstrip button.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+  .weekstrip button.sel .wk{color:rgba(255,255,255,.8)}
+  .weekstrip button.rel{box-shadow:inset 0 -3px 0 var(--warn)}
+  .saybox{border-radius:8px;padding:13px 15px;font-size:14.5px;line-height:1.55;
+    background:var(--panel2);border-left:3px solid var(--line)}
+  .saybox.bad{border-left-color:var(--bad)}
+  .saybox.ok{border-left-color:var(--accent)}
+  .saybox .src{display:block;margin-top:8px;font-size:12.5px;color:var(--dimmer)}
+  tr.rel td{border-top:2px solid var(--warn)}
+  tr.sel{background:var(--panel2)}
+  tr.sel td{font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rook Dispatch · Standing</h1>
+  <span class="sub">prototype for Helen — not a spec, not built</span>
+  <span class="spacer"></span>
+  <button id="theme">Light</button>
+</header>
+
+<nav>
+  <button data-v="today" class="on">Kip's console — today</button>
+  <button data-v="proposed">Kip's console — proposed</button>
+  <button data-v="mite">Meteor Mite — week by week</button>
+  <button data-v="phone">Meteor Mite's phone</button>
+  <button data-v="recover">Walk the recovery</button>
+  <button data-v="dot">Dot's kitchen counter</button>
+  <button data-v="unknown">What we don't know</button>
+</nav>
+
+<main>
+
+<!-- ============ TODAY ============ -->
+<section id="v-today">
+  <div class="note">
+    <b>What Kip sees now.</b> Two responders, same city, same weeks, side by side on his
+    centre monitor. Real numbers from <code>callout-history.csv</code>. Nothing on this
+    screen explains the difference — his words: <i>"two cards that might as well be two
+    different products."</i>
+  </div>
+  <div class="cards" id="todayCards"></div>
+  <div class="shrug">
+    There is no third panel. This is the whole screen. Kip's only available action is to
+    text Meteor Mite "hang in there, it'll pick up."
+  </div>
+</section>
+
+<!-- ============ PROPOSED ============ -->
+<section id="v-proposed" hidden>
+  <div class="note">
+    <b>1 · Standing, in plain words, with the reason.</b> Same two cards, one block added to
+    each: where this responder sits in the ranking, why they're there, whether it's
+    recovering, and what would change it. The score under the hood is unchanged — we're just
+    no longer the only ones who can see it.
+  </div>
+  <div class="cards" id="propCards"></div>
+
+  <h3 class="sec">What's new on this screen</h3>
+  <ul class="tight">
+    <li><b>1 · Standing in plain words, with the reason.</b> "Ranked below most nearby
+        responders" beats "0.14" — and the card says <i>why</i> underneath it, in a sentence
+        Kip could read out to Mite over the phone.</li>
+    <li><b>2 · The trap named, and a way out of it.</b> The card states outright that
+        standing only rises by accepting an offer, and Mite has stopped getting offers —
+        so nothing recovers on its own. The guaranteed look is the way out.</li>
+    <li><b>Direction, not just a level.</b> Recovering / not recovering. Mite's isn't, and
+        structurally can't.</li>
+    <li><b>The Gale gets a card too.</b> High standing isn't a reward — the same mechanism
+        that starved Mite is overloading Gale, and Kip should see both halves as one story.</li>
+  </ul>
+  <p class="why">Both responders are Kip's, same city, same weeks. Today he has no third
+     panel and nothing to tell either of them.</p>
+</section>
+
+<!-- ============ MITE DETAIL ============ -->
+<section id="v-mite" hidden>
+  <div class="note">
+    <b>Where this actually happens.</b> Kip clicks Meteor Mite's card and lands here — the
+    responder detail page. This screen exists today and shows the top two rows only. Everything
+    below the divider is what standing would add. <b>Click any week</b> in the strip to see
+    what Kip's console said that week, and what it would have said instead.
+  </div>
+
+  <div class="mhead">
+    <div>
+      <h2>Meteor Mite</h2>
+      <span class="who">handler: Kip · flight, structural-entry · region: same as The Gale</span>
+    </div>
+    <span class="pill bad" id="miteStatePill">Low — not recovering</span>
+  </div>
+
+  <div class="weekstrip" id="miteStrip"></div>
+
+  <div class="two">
+    <div>
+      <p class="lbl">What the console shows this week — today</p>
+      <div class="card"><div class="body" id="miteNow"></div></div>
+    </div>
+    <div>
+      <p class="lbl">What it would show — proposed</p>
+      <div class="card"><div class="body" id="miteProp"></div></div>
+    </div>
+  </div>
+
+  <h3 class="sec">What Kip has to say to Meteor Mite that week</h3>
+  <div class="two">
+    <div><p class="lbl">Today</p><div class="saybox bad" id="miteSayNow"></div></div>
+    <div><p class="lbl">Proposed</p><div class="saybox ok" id="miteSayProp"></div></div>
+  </div>
+
+  <h3 class="sec">The whole run, from Kip's side</h3>
+  <table id="miteTable"></table>
+
+  <div class="open">
+    <p><b>Every number on this screen is Meteor Mite's real row</b> in
+       <code>callout-history.csv</code>, weeks of 29 Jun to 31 Aug. The standing percentages
+       and rank positions are illustrative — I don't have access to the actual stored scores,
+       which is one of the things I'd need Ravi for.</p>
+    <p><b>On the name.</b> Kip never uses a pronoun for Meteor Mite in the interview — it's
+       "Mite thinks Mite's been forgotten," twice in one sentence. I've followed that here and
+       used the name throughout. Earlier drafts of this prototype said "he," which I'd invented.
+       Cover identity isn't something Dispatch stores, so the console shouldn't assert it.</p>
+  </div>
+</section>
+
+<!-- ============ PHONE ============ -->
+<section id="v-phone" hidden>
+  <div class="note">
+    <b>3 · Tell the responder directly.</b> Meteor Mite has been texting Kip all week asking
+    if something's broken. Nothing is broken — Meteor Mite has been ranked down, and there is
+    currently no screen anywhere that would say so. Kip can't say it either; the console
+    doesn't know. Same information as the handler card, on the device the silence is
+    happening on.
+  </div>
+  <div class="two">
+    <div>
+      <p class="lbl">Today — 31 August</p>
+      <div class="phone">
+        <div class="bar"><span>Rook</span><span>23:41</span></div>
+        <h2>Meteor Mite</h2>
+        <div class="cover">Available · flight, structural-entry</div>
+        <div class="quiet">
+          <div class="z">— — —</div>
+          <p>No callouts</p>
+        </div>
+      </div>
+      <p class="why" style="text-align:center;max-width:330px;margin:12px auto 0">
+        1 offer this week. 0 taken. No explanation available to Meteor Mite, to Kip,
+        or to support.
+      </p>
+    </div>
+    <div>
+      <p class="lbl">Proposed</p>
+      <div class="phone">
+        <div class="bar"><span>Rook</span><span>23:41</span></div>
+        <h2>Meteor Mite</h2>
+        <div class="cover">Available · flight, structural-entry</div>
+        <div class="standing low">
+          <h3>Your standing <span class="pill bad">Low</span></h3>
+          <p><b>Nothing is broken. You're being offered fewer callouts right now.</b></p>
+          <div class="meter"><i style="width:14%;background:var(--bad)"></i></div>
+          <p class="why">
+            Since 10 August we sent you 11 offers and 1 came back as a yes. Each one we
+            didn't hear back on moved you down the list, and further down the list means
+            fewer offers.
+          </p>
+          <p class="why" style="margin-top:8px">
+            Right now the only thing that moves you back up is accepting a callout — which
+            is the part that's got harder. We know that's a trap. It's why the next bit
+            exists.
+          </p>
+        </div>
+        <div class="standing" style="border-color:var(--accent)">
+          <h3>Your next guaranteed look <span class="pill ok">Thu</span></h3>
+          <p>You've been quiet 2 weeks, so <b>the next callout you can do comes to you
+             first</b> — ahead of the ranking.</p>
+          <p class="why">You'll get <b>90 seconds</b> to answer it instead of 60. Take it
+             and your standing starts climbing back normally.</p>
+          <p class="why" style="margin-top:8px">No need to check with your handler — this
+             page is the same thing Kip sees.</p>
+        </div>
+      </div>
+      <p class="why" style="text-align:center;max-width:330px;margin:12px auto 0">
+        Same quiet week. Completely different week to live through — and no reason to text
+        Kip asking whether the app is broken.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RECOVER ============ -->
+<section id="v-recover" hidden>
+  <div class="note">
+    <b>2 · Quiet for two weeks → a callout regardless of rank.</b> Today the only way out of
+    low standing is accepting an offer, and offers are exactly what a low-standing responder
+    has stopped receiving. It's a closed loop. Mite cannot get out of it by trying harder.
+    <br><br>
+    <b>Wen's 2019 question, answered.</b> <i>"Should this ease back toward neutral on its
+    own?"</i> — her worry against it still holds: someone who genuinely stopped working
+    shouldn't quietly climb back. So: no automatic decay. Instead, a guaranteed look.
+    You still earn it back — we just make sure the chance to arrives.
+    <br><br>Click through the weeks. Arithmetic is illustrative
+    (<code>ACCEPTANCE_CREDIT 0.08</code> / <code>DECLINE_PENALTY 0.12</code>, starting
+    score assumed); Marcus and Ravi can produce real ones.
+  </div>
+
+  <div class="two">
+    <div>
+      <p class="lbl">Meteor Mite's standing</p>
+      <div class="card">
+        <div class="body">
+          <div class="stat"><span id="recWeek">Week of 31 Aug</span>
+            <span class="pill" id="recPill">Low</span></div>
+          <div class="big" id="recScore" style="margin:12px 0 2px">0.14</div>
+          <div class="meter"><i id="recBar" style="width:14%"></i></div>
+          <div class="stat"><span>Rank among nearby responders</span><span id="recRank">14th of 16</span></div>
+          <div class="stat"><span>Offers that week</span><span id="recOffers">1</span></div>
+          <div class="stat"><span>Recovers on its own?</span><span id="recSelf" class="bad">No</span></div>
+        </div>
+      </div>
+      <div class="ctl">
+        <button id="recBack">← Back</button>
+        <button id="recFwd" class="primary">Next week →</button>
+        <button id="recReset">Reset</button>
+      </div>
+    </div>
+    <div>
+      <p class="lbl">What happened</p>
+      <div class="log" id="recLog"></div>
+    </div>
+  </div>
+
+  <h3 class="sec">The rule, stated plainly</h3>
+  <ul class="tight">
+    <li>Below standing <b>and</b> under ~3 offers a week for two consecutive weeks → flagged.</li>
+    <li>Next suitable callout in range routes to them first, ignoring rank. One per week, capped.</li>
+    <li>That offer gets the old <b>90s</b> window, not 60 — they're cold, not unwilling.</li>
+    <li>Taken → normal credit, and they re-enter the ranking honestly. Missed → no extra
+        penalty, but the next look is the week after, not the same day.</li>
+    <li>Handler and responder both see it coming. Nadia's team can see it on a ticket.</li>
+  </ul>
+  <p class="why">Thresholds are placeholders for Wen and Sofia, not decisions.</p>
+</section>
+
+<!-- ============ DOT ============ -->
+<section id="v-dot" hidden>
+  <div class="note">
+    <b>The evidence I nearly left out.</b> Aunt Dot handles Vesper — another responder who
+    went quiet after 4.2. Sofia interviewed her on 3 Sept, and she articulated this feature
+    before I did, unprompted:
+    <br><br>
+    <span style="color:var(--ink);font-size:16px">"Maybe something that tells me too, not
+    just him… <b>I don't need to do anything about it. I'd just like to know.</b>"</span>
+    <br><br>
+    She also said the thing that makes the case on its own: <i>"I hadn't really put those two
+    things next to each other before, the quiet weeks and the fast-vanishing ones."</i> She
+    has been living both halves of 4.2 — the 60-second race and the silence — and had no way
+    to see they were the same story. That connection is precisely what standing draws.
+  </div>
+
+  <div class="two">
+    <div>
+      <p class="lbl">Vesper — same data, Kip's layout</p>
+      <div id="dotSmall"></div>
+      <p class="why" style="margin-top:10px">This is the card I designed. Dot works standing
+        at a kitchen counter with the laptop next to the toaster. Her words: <i>"the text is
+        small enough that from a normal standing distance I sometimes can't tell if something's
+        changed unless I lean right in, and leaning right in with wet hands over a laptop is
+        not something I recommend."</i> She has considered buying reading glasses for this.
+        <b>She would not read any of the above.</b></p>
+    </div>
+    <div>
+      <p class="lbl">Vesper — readable from two steps back</p>
+      <div class="bigtype" id="dotBig"></div>
+      <p class="why" style="margin-top:10px">Same information, one glanceable line first,
+        detail underneath for when she does lean in. If standing only works on Kip's
+        three-monitor desk, it doesn't work.</p>
+    </div>
+  </div>
+
+  <h3 class="sec">What Dot adds that Kip didn't</h3>
+  <ul class="tight">
+    <li><b>A third surface.</b> She wants to be told, not just him — her problem is hearing
+        a buzz through a ceiling. Handler notification isn't in my proposal at all.</li>
+    <li><b>She validates piece 1 and undercuts my framing of it.</b> "I don't need to do
+        anything about it, I'd just like to know" — knowing has standalone value. I'd argued
+        standing was only worth shipping alongside the guaranteed look. Dot says otherwise,
+        and she's the user.</li>
+    <li><b>Legibility is a requirement, not polish.</b> Two handlers, two completely
+        different physical setups, and I designed for one of them.</li>
+    <li><b>She never complained.</b> Vesper went 14 callouts a week to 1 and Dot filed
+        nothing — she adapted, and told him to keep the phone in his pocket. The ticket pile
+        would never have found her.</li>
+  </ul>
+</section>
+
+<!-- ============ UNKNOWN ============ -->
+<section id="v-unknown" hidden>
+  <div class="note">
+    <b>Read this before the rest.</b> Helen asked for something real rather than tidy. The
+    other tabs look like a finished feature; they aren't one. These are the things that would
+    stop this being built, in the order they'd stop it.
+  </div>
+
+  <div class="log">
+    <div class="ev loss"><span class="w">Blocker</span><span>
+      <b>Dispatch doesn't know if an offer arrived.</b> <code>push_to_device()</code> returns
+      nothing; there's no delivery confirmation anywhere in <code>offer.py</code>. So every
+      "11 offers reached you" on these screens is a claim the system can't make. Nightwell and
+      Ironvale filed tickets saying they get nothing during the exact weeks the backend has
+      them at the top — if that's a delivery fault, standing would show them a confident,
+      well-designed lie. Marcus owns this, and it's a prerequisite, not a check.
+    </span></div>
+
+    <div class="ev loss"><span class="w">Unpriced</span><span>
+      <b>A guaranteed look is taken from the incident.</b> If Meteor Mite is 34 minutes out and
+      someone else is 6, routing Mite first costs response time — plus 90 seconds before the
+      cascade starts. In a protective-response product that's a safety trade, and nothing in
+      this prototype prices it. Nobody can approve the feature until we say what delay we're
+      willing to buy a recovery with.
+    </span></div>
+
+    <div class="ev loss"><span class="w">Scale</span><span>
+      <b>It's not one responder, it's a quarter of the roster.</b> My own threshold, run
+      against the CSV for the weeks of 24 and 31 Aug, flags Farlight, Meteor Mite, The Undertow
+      and Vesper — <b>4 of 16</b> simultaneously. At that volume this isn't a safety valve,
+      it's a second routing policy, and contention between competing guaranteed looks is
+      undefined.
+    </span></div>
+
+    <div class="ev loss"><span class="w">Undefined</span><span>
+      <b>"The next callout Meteor Mite can do" isn't a concept the system has.</b>
+      <code>capability_score</code> is partial credit, <code>rank_for_callout</code> never
+      filters ("Nobody is removed here"), and a callout carries no severity field — so
+      "give Mite an easy one to warm up on" can't be expressed without a data-model change.
+    </span></div>
+
+    <div class="ev loss"><span class="w">Cost</span><span>
+      <b>It makes the headline metric worse, deliberately.</b> Guaranteed looks route offers
+      to the people most likely to miss them, which drags acceptance rate down — the number
+      Ravi reports weekly. Needs either a segmented metric or an explicit agreement with Helen
+      that this is judged on distribution instead.
+    </span></div>
+
+    <div class="ev loss"><span class="w">Scope</span><span>
+      <b>The 90 seconds reopens a settled decision.</b> 4.2 cut 90→60 on purpose and ping
+      timeout tuning is a committed Q3 item. Restoring it for a subset is a roadmap change
+      that goes through Helen, not an implementation detail of something else.
+    </span></div>
+
+    <div class="ev"><span class="w">Unowned</span><span>
+      <b>Whose decision is a guaranteed look?</b> Kip's card has a button; Mite's phone says
+      it's already scheduled. If it's automatic the button is wrong; if it's Kip's call we've
+      handed a handler at 2am a rationing decision between his own two responders plus an
+      override that delays incidents.
+    </span></div>
+
+    <div class="ev"><span class="w">Untested</span><span>
+      <b>Neither of the two people this is for has seen it.</b> Kip explicitly declined to
+      specify what he'd want — <i>"I don't even know what I'd want it to tell me… I'm not the
+      person to ask about that part"</i> — and what he did ask for, four times, is dark mode.
+      No responder who has gone quiet has ever been interviewed; Meteor Mite's screen is my
+      invention of how that week feels. Dot is the only direct evidence that standing is
+      wanted.
+    </span></div>
+
+    <div class="ev"><span class="w">Not asked</span><span>
+      <b>Wen hasn't seen this.</b> The recovery tab answers her 2019 note by name, in a
+      document going to her director, while she's back from PTO with my questions still
+      unsent. She's the only source of truth on routing.
+    </span></div>
+
+    <div class="ev"><span class="w">Plumbing</span><span>
+      <code>history.py</code> holds scores in a module-level dict with no persistence, so
+      "since 10 Aug" is history we don't currently store. And whether standing belongs in the
+      Responder Availability Record matters — Supply reads it, and quartermasters probably
+      shouldn't see it.
+    </span></div>
+  </div>
+
+  <h3 class="sec">What I'd tell Helen</h3>
+  <p class="why" style="font-size:14.5px">
+    Let engineering ship the timeout-vs-decline fix. It's a real defect, it's correct on its
+    own merits, and holding it hostage to this proposal would be me protecting my idea rather
+    than the product. Standing is the slower, separate conversation — and it stays a direction
+    rather than a plan until the cost side above has answers.
+  </p>
+</section>
+
+<!-- ============ MODAL: GUARANTEED LOOK ============ -->
+<div class="overlay" id="m-look">
+  <div class="modal">
+    <div class="mtop"><h2>Schedule a guaranteed look</h2>
+      <span class="who">Meteor Mite · handler: Kip</span>
+      <button class="x" data-close>&times;</button></div>
+    <div class="mbody">
+      <h4>What this does</h4>
+      <p>The next callout Meteor Mite is qualified for, within 45 minutes, goes to
+         Meteor Mite <b>first</b> — ahead of the ranking. One offer only, with
+         <b>90 seconds</b> to answer instead of 60.</p>
+      <p>Taken, normal credit applies and Meteor Mite re-enters the ranking on merit.
+         Missed, no extra penalty, and the next look is in 7 days.</p>
+
+      <h4>What it costs</h4>
+      <div class="cost">
+        <div class="stat"><span>Responders Meteor Mite is routed ahead of</span><span>up to 3</span></div>
+        <div class="stat"><span>Estimated added travel time to the incident</span>
+          <span class="bad">+12 to +28 min</span></div>
+        <div class="stat"><span>Added delay before cascade, if unanswered</span>
+          <span class="bad">+90 sec</span></div>
+        <div class="stat"><span>Effect on this week's acceptance rate</span>
+          <span class="warn">likely down</span></div>
+      </div>
+      <p class="why" style="margin-top:9px">This is the part the one-pager originally
+         costed at zero. A guaranteed look isn't free — it's taken from the incident, and
+         in a protective-response product that's a real trade.</p>
+
+      <h4>Expires</h4>
+      <p>If no qualifying callout comes up within 7 days, the look lapses and Meteor Mite is
+         re-flagged.</p>
+
+      <div class="open">
+        <p><b>Open — who authorises this?</b> This screen assumes it's Kip's call. It could
+           equally be automatic. Both are currently in the prototype, which is a
+           contradiction, not a design. If it's Kip's, we've handed a handler at 2am a
+           rationing decision between his own two responders that also delays an incident.</p>
+        <p><b>Open — "qualified for" isn't a thing routing can express.</b>
+           <code>capability_score</code> is partial credit and <code>rank_for_callout</code>
+           never filters. And with no severity field on a callout, we can't prefer a
+           lower-stakes incident for someone warming back up.</p>
+        <p><b>Open — Mite isn't the only one owed one.</b> Farlight, The Undertow and Vesper
+           all qualify in the same weeks. Contention between competing looks is undefined.</p>
+      </div>
+    </div>
+    <div class="mfoot"><button data-close>Cancel</button>
+      <button class="primary" data-close>Confirm — schedule for Thursday</button></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: EXPLAIN ============ -->
+<div class="overlay" id="m-explain">
+  <div class="modal">
+    <div class="mtop"><h2>What does standing mean?</h2>
+      <span class="who">plain-language explainer</span>
+      <button class="x" data-close>&times;</button></div>
+    <div class="mbody">
+      <h4>How Dispatch decides who to ask first</h4>
+      <p>Every available responder gets a score for each callout. Highest score is asked
+         first; if they don't say yes, we move down the list. Three things go into it:</p>
+      <div class="formula">
+        <b>60%</b> &nbsp;how close they are &nbsp;<span style="opacity:.6">— was 45% before 4.2</span><br>
+        <b>25%</b> &nbsp;how often they've been accepting lately &nbsp;<span style="opacity:.6">— was 40%</span><br>
+        <b>15%</b> &nbsp;whether they can do this kind of work &nbsp;<span style="opacity:.6">— unchanged since 4.0</span>
+      </div>
+      <p class="why" style="margin-top:9px">Closeness isn't pass/fail — it falls off steadily
+         with travel time and hits zero at 45 minutes. Five minutes out and forty minutes
+         out are very different scores.</p>
+
+      <h4>Standing is the middle one</h4>
+      <p>Everyone starts at 0.5. Accept a callout and it goes <b>up 0.08</b>. Turn one down
+         — <i>or don't answer in time</i> — and it goes <b>down 0.12</b>. Those two are
+         currently scored identically, which is the defect engineering is fixing.</p>
+
+      <h4>Why it doesn't come back on its own</h4>
+      <p>There is no decay. Standing only rises when someone accepts an offer — and a low
+         standing means fewer offers arrive. Fewer offers, fewer chances to recover, and any
+         rare offer is likelier to lapse in 60 seconds anyway. It is a one-way trap, and
+         nothing in the system reverses it.</p>
+
+      <h4>What 4.2 changed</h4>
+      <p>Closeness started counting more and standing less, and the answer window went from
+         90 to 60 seconds. Nobody's standing was reset at the release — whatever score a
+         responder was carrying carried straight over.</p>
+
+      <div class="open">
+        <p><b>This panel is the routing documentation that doesn't exist.</b> There is no
+           written spec for how ranking decides who gets pinged — it's a known open item.
+           Half the value of building this screen is that it forces one to exist.</p>
+        <p><b>Wen has to confirm every line above before it ships.</b> It's assembled from
+           reading <code>routing.py</code>, <code>history.py</code> and
+           <code>config.py</code>, not from anyone who built it. Publishing a confident
+           explanation that turns out to be wrong is worse than publishing nothing.</p>
+      </div>
+    </div>
+    <div class="mfoot"><button class="primary" data-close>Close</button></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: CAP ============ -->
+<div class="overlay" id="m-cap">
+  <div class="modal">
+    <div class="mtop"><h2>Cap weekly volume</h2>
+      <span class="who">The Gale · handler: Kip</span>
+      <button class="x" data-close>&times;</button></div>
+    <div class="mbody">
+      <p>The Gale is at <b>21 callouts this week</b>, up from 13 before 4.2. Capping stops
+         Dispatch offering past the limit for the rest of the week.</p>
+
+      <h4>Weekly limit</h4>
+      <div class="caps" id="capBtns"></div>
+
+      <h4>Where those callouts go instead</h4>
+      <div id="capOut"></div>
+
+      <div class="open" id="capNote"></div>
+    </div>
+    <div class="mfoot"><button data-close>Cancel</button>
+      <button class="primary" data-close>Apply cap</button></div>
+  </div>
+</div>
+
+<footer>
+  Prototype, 22 Sept 2026 — Onur, PM Dispatch. Numbers from
+  <code>00-rook/data/callout-history.csv</code>; quotes from Kip's 4 Sept interview with
+  Sofia. Dark by default because that's how Kip works at 11pm — the actual dark-mode ask
+  belongs to Sofia's console redesign, not this.
+  <br><br>
+  <b>Blocked on one check before any of this is worth building:</b> Nightwell and Ironvale
+  filed tickets saying they receive nothing during the exact weeks the backend records them
+  at the top of the file. If offers aren't reaching phones, standing explains a number that
+  isn't the problem. Marcus rules out notification delivery first.
+</footer>
+
+</main>
+
+<script>
+const WEEKS = ["29 Jun","6 Jul","13 Jul","20 Jul","27 Jul","3 Aug","10 Aug","17 Aug","24 Aug","31 Aug"];
+const MITE = [[11,7],[12,9],[10,6],[11,7],[12,9],[11,8],[10,4],[4,1],[2,0],[1,0]];
+const GALE = [[13,10],[12,9],[13,10],[14,11],[13,11],[13,10],[15,9],[17,12],[20,14],[21,16]];
+const RELEASE = 6; // week of 10 Aug contains the 12 Aug release
+
+function spark(rows, tone){
+  const max = Math.max(...rows.map(r=>r[0]));
+  return '<div class="spark">' + rows.map((r,i)=>{
+    const cls = i < RELEASE ? '' : (tone==='hot' ? 'hot' : 'cold');
+    return `<i class="${cls}" style="height:${Math.round(r[0]/max*100)}%" title="${WEEKS[i]}: ${r[0]} offers, ${r[1]} taken"></i>`;
+  }).join('') + '</div><div class="axis"><span>29 Jun</span><span>4.2 ships</span><span>31 Aug</span></div>';
+}
+
+function card(name, handlerNote, rows, tone, standing){
+  const last = rows[rows.length-1], pre = rows[5];
+  const rate = last[0] ? Math.round(last[1]/last[0]*100) : 0;
+  return `<div class="card">
+    <div class="top"><h2>${name}</h2><span class="who">${handlerNote}</span></div>
+    <div class="body">
+      <div class="stat"><span>Offers this week</span>
+        <span class="${tone==='hot'?'ok':'bad'}"><b>${last[0]}</b></span></div>
+      <div class="stat"><span>Taken</span><span>${last[1]} (${rate}%)</span></div>
+      <div class="stat"><span>Week before 4.2</span><span>${pre[0]} offers, ${pre[1]} taken</span></div>
+      ${spark(rows, tone)}
+      ${standing || ''}
+    </div></div>`;
+}
+
+const noteMite = "handler: Kip · flight, structural-entry";
+const noteGale = "handler: Kip · structural-entry, hazmat-tolerant";
+
+document.getElementById('todayCards').innerHTML =
+  card("Meteor Mite", noteMite, MITE, 'cold') +
+  card("The Gale", noteGale, GALE, 'hot');
+
+const standMite = `<div class="standing low">
+  <h3>Standing <span class="pill bad">Low — not recovering</span></h3>
+  <p><b>Meteor Mite is being ranked below most nearby responders.</b> Available and
+     reachable. Not being asked.</p>
+  <div class="meter"><i style="width:14%;background:var(--bad)"></i></div>
+
+  <p class="why"><b>Why:</b> since 10 Aug we sent Meteor Mite 11 offers and got 1 yes.
+     Each no-answer lowered the ranking, and a lower ranking means fewer offers.
+     4.2 made proximity count more and acceptance count less, so the gap widened faster
+     than it used to.</p>
+
+  <p class="why" style="border-left:2px solid var(--bad);padding-left:10px;margin-top:10px">
+     <b>There is no way back from here.</b> Standing only goes up on an accepted
+     offer — and offers are what Meteor Mite has stopped getting. Nothing in the system
+     reverses this on its own. It stays like this until someone intervenes.</p>
+
+  <p class="why" style="border-left:2px solid var(--accent);padding-left:10px;margin-top:10px">
+     <b>Proposed:</b> quiet for 2 consecutive weeks, so Dispatch sends Meteor Mite the next
+     callout he can do <b>regardless of ranking</b> — a way back that doesn't depend on
+     an offer that isn't coming.</p>
+
+  <p style="margin:12px 0 0"><button class="primary" data-modal="look">Schedule a guaranteed look</button>
+     <button data-modal="explain">What does standing mean?</button></p>
+  <p class="why" style="margin-top:8px;opacity:.75">Caveat: "sent" is all Dispatch actually
+     knows today — there's no delivery confirmation, so we can't yet say these 11 offers
+     reached the phone. That has to be fixed before this wording is honest.</p>
+</div>`;
+
+const standGale = `<div class="standing">
+  <h3>Standing <span class="pill ok">High</span></h3>
+  <p>Ranked at or near the top for most incidents in this area.</p>
+  <div class="meter"><i style="width:86%;background:var(--ok)"></i></div>
+  <p class="why">Volume up 62% since 4.2. Not a reward — the ranking got more decisive,
+     and work that used to spread across the area is landing here.
+     <b>Flagged for load.</b></p>
+  <p style="margin:12px 0 0"><button data-modal="cap">Cap weekly volume</button></p>
+</div>`;
+
+document.getElementById('propCards').innerHTML =
+  card("Meteor Mite", noteMite, MITE, 'cold', standMite) +
+  card("The Gale", noteGale, GALE, 'hot', standGale);
+
+/* ---- Meteor Mite, week by week ---- */
+/* offers/taken are Meteor Mite's real CSV row. standing/rank are illustrative. */
+const MW = [
+ {s:.62,rank:"6th of 16",st:"Normal",
+  now:"Nothing unusual. Kip doesn't open this page.",
+  prop:"Standing normal. Ranked mid-field for this area. No action.",
+  sayNow:"Nothing to say — it's a normal week.",
+  sayProp:"Nothing to say — and now the screen confirms that, rather than Kip inferring it."},
+ {s:.66,rank:"5th of 16",st:"Normal",
+  now:"Nothing unusual.",
+  prop:"Standing normal and steady.",
+  sayNow:"Nothing to say.", sayProp:"Nothing to say."},
+ {s:.60,rank:"7th of 16",st:"Normal",
+  now:"A quieter week. Indistinguishable from noise.",
+  prop:"Standing normal. Volume dip is within the usual range — not flagged.",
+  sayNow:"Nothing to say.",
+  sayProp:"Nothing — and the card says so explicitly, which is what stops Kip worrying about a week that doesn't matter."},
+ {s:.62,rank:"6th of 16",st:"Normal",
+  now:"Nothing unusual.", prop:"Standing normal.",
+  sayNow:"Nothing to say.", sayProp:"Nothing to say."},
+ {s:.66,rank:"5th of 16",st:"Normal",
+  now:"A good week.", prop:"Standing normal, trending up slightly.",
+  sayNow:"Nothing to say.", sayProp:"Nothing to say."},
+ {s:.68,rank:"4th of 16",st:"Normal",
+  now:"A good week. This is the last one.",
+  prop:"Standing normal — highest of the summer. Baseline for everything that follows.",
+  sayNow:"Nothing to say.",
+  sayProp:"Nothing to say. Worth noting only in hindsight: this is Meteor Mite's healthy baseline, and the card now records it."},
+ {s:.48,rank:"7th of 16",st:"Slipping",
+  now:"Acceptance drops to 40%. The offer count barely moves, so nothing on Kip's screen changes colour.",
+  prop:"<b>Standing slipping.</b> 6 unanswered offers this week against 4 taken. 4.2 shipped Wednesday and now weights proximity 0.60 / acceptance 0.25 — unanswered offers cost more than they did last week.",
+  sayNow:"Kip doesn't know anything has happened. Neither does Meteor Mite.",
+  sayProp:"\u201cSomething changed in Wednesday's release and your ranking is sliding. It's the missed ones doing it — the 60-second window is new.\u201d Actionable while it's still reversible."},
+ {s:.30,rank:"11th of 16",st:"Low",
+  now:"Offers fall from 10 to 4. Kip notices, because Meteor Mite starts texting.",
+  prop:"<b>Standing low.</b> Ranked below most nearby responders. First week under threshold — one more and a guaranteed look is scheduled automatically.",
+  sayNow:"\u201cHang in there, it'll pick up.\u201d Kip's actual words. He has nothing better, and it isn't true.",
+  sayProp:"\u201cYou've been ranked down since the release. It won't pick up on its own. If next week is the same, the system sends you one regardless of rank.\u201d"},
+ {s:.19,rank:"13th of 16",st:"Low — not recovering",
+  now:"2 offers, 0 taken. Still nothing on screen that distinguishes this from a quiet fortnight.",
+  prop:"<b>Second consecutive week under threshold. Guaranteed look scheduled.</b> Standing does not recover on its own — it only rises on an accepted offer, and offers have stopped.",
+  sayNow:"\u201cHang in there\u201d again. Meteor Mite is now asking whether the app is broken.",
+  sayProp:"\u201cThursday you get one ahead of the ranking, with 90 seconds instead of 60. That's the way back.\u201d A date, instead of a reassurance."},
+ {s:.14,rank:"14th of 16",st:"Low — not recovering",
+  now:"1 offer. 0 taken. The Gale, same city, same week, is at 21 offers and 16 taken.",
+  prop:"<b>Standing low, not recovering.</b> 11 offers since 10 Aug, 1 taken. The trap named on the card: standing only rises by accepting, and accepting requires an offer.",
+  sayNow:"Nothing honest. This is the week Kip described to Sofia as \u201ctwo cards that might as well be two different products.\u201d",
+  sayProp:"The explanation, plus a scheduled look. Kip stops being the only part of the system that knows something is wrong, and he learned it on 10 Aug rather than never."}
+];
+let mw = 9;
+function renderMite(){
+  const d = MW[mw], r = MITE[mw], rate = r[0] ? Math.round(r[1]/r[0]*100) : 0;
+  document.getElementById('miteStrip').innerHTML = MITE.map((x,i)=>
+    `<button data-mw="${i}" class="${i===mw?'sel':''} ${i===RELEASE?'rel':''}">
+       <span class="wk">${WEEKS[i]}</span><span class="vol">${x[0]}</span></button>`).join('');
+  const pill = document.getElementById('miteStatePill');
+  pill.textContent = d.st;
+  pill.className = 'pill ' + (d.s<.25?'bad':d.s<.55?'':'ok');
+
+  document.getElementById('miteNow').innerHTML =
+    `<div class="stat"><span>Offers</span><span class="${r[0]<5?'bad':''}"><b>${r[0]}</b></span></div>
+     <div class="stat"><span>Taken</span><span>${r[1]} (${rate}%)</span></div>
+     <div class="stat"><span>Standing</span><span class="dim">not shown</span></div>
+     <div class="stat"><span>Reason</span><span class="dim">not shown</span></div>
+     <p class="why" style="margin-top:12px">${d.now}</p>`;
+
+  document.getElementById('miteProp').innerHTML =
+    `<div class="stat"><span>Offers</span><span class="${r[0]<5?'bad':''}"><b>${r[0]}</b></span></div>
+     <div class="stat"><span>Taken</span><span>${r[1]} (${rate}%)</span></div>
+     <div class="stat"><span>Standing</span><span class="${d.s<.25?'bad':d.s<.55?'warn':'ok'}">
+       <b>${d.st}</b></span></div>
+     <div class="stat"><span>Rank for this area</span><span>${d.rank}</span></div>
+     <div class="meter"><i style="width:${Math.round(d.s*100)}%;background:var(${
+       d.s<.25?'--bad':d.s<.55?'--warn':'--ok'})"></i></div>
+     <p class="why" style="margin-top:12px">${d.prop}</p>`;
+
+  document.getElementById('miteSayNow').innerHTML = d.sayNow;
+  document.getElementById('miteSayProp').innerHTML = d.sayProp;
+
+  document.getElementById('miteTable').innerHTML =
+    `<tr><th>Week</th><th class="n">Offers</th><th class="n">Taken</th>
+      <th class="n">Rate</th><th>Would the console have flagged it?</th></tr>` +
+    MITE.map((x,i)=>{
+      const rt = x[0] ? Math.round(x[1]/x[0]*100) : 0;
+      const f = MW[i].s<.25 ? '<span class="pill bad">Low — look scheduled</span>'
+              : MW[i].s<.55 ? '<span class="pill">Slipping</span>'
+              : '<span class="dim">no</span>';
+      return `<tr class="${i===mw?'sel':''} ${i===RELEASE?'rel':''}" data-mw="${i}">
+        <td>${WEEKS[i]}${i===RELEASE?' <span class="dim">· 4.2 ships</span>':''}</td>
+        <td class="n">${x[0]}</td><td class="n">${x[1]}</td>
+        <td class="n ${rt<40?'bad':''}">${rt}%</td><td>${f}</td></tr>`;
+    }).join('');
+}
+renderMite();
+document.getElementById('v-mite').addEventListener('click', e=>{
+  const t = e.target.closest('[data-mw]');
+  if(t){ mw = +t.dataset.mw; renderMite(); }
+});
+
+/* ---- Dot / Vesper ---- */
+const VESPER = [[14,11],[13,10],[15,13],[14,11],[13,11],[14,12],[12,6],[5,1],[2,0],[1,0]];
+const noteVesper = "handler: Aunt Dot · aquatic, cold-weather";
+
+const standVesperSmall = `<div class="standing low">
+  <h3>Standing <span class="pill bad">Low — not recovering</span></h3>
+  <p>Ranked below most nearby responders. Available and reachable; not being asked.</p>
+  <div class="meter"><i style="width:11%;background:var(--bad)"></i></div>
+  <p class="why">Since 10 Aug, 8 offers and 1 yes. Each no-answer lowered his ranking and a
+     lower ranking means fewer offers. Standing only rises by accepting one, so this does not
+     reverse on its own.</p>
+</div>`;
+
+const standVesperBig = `<div class="standing low">
+  <p class="glance">It's quiet because he's been ranked down — not because nothing's
+     happening.</p>
+  <div class="meter"><i style="width:11%;background:var(--bad)"></i></div>
+  <p class="why">8 offers since 10 Aug, 1 taken. It won't pick up on its own.</p>
+  <p class="why" style="border-left:2px solid var(--accent);padding-left:10px;margin-top:10px">
+     <b>Next guaranteed look: Thursday.</b> He gets the next suitable callout ahead of the
+     ranking, with 90 seconds to answer.</p>
+  <p class="why" style="margin-top:10px">You'll get the alert too, on this laptop — not just
+     his phone.</p>
+</div>`;
+
+document.getElementById('dotSmall').innerHTML =
+  card("Vesper", noteVesper, VESPER, 'cold', standVesperSmall);
+document.getElementById('dotBig').innerHTML =
+  card("Vesper", noteVesper, VESPER, 'cold', standVesperBig);
+
+/* ---- recovery walkthrough ---- */
+const STEPS = [
+  {w:"Week of 31 Aug",  s:0.14, rank:"14th of 16", offers:1, self:"No",
+   log:[["31 Aug","1 offer all week. Unanswered — he was 34 min out and it went to someone closer.","loss"],
+        ["","Standing unchanged at floor-adjacent. Nothing in the system moves it back.","loss"]]},
+  {w:"Week of 7 Sept — flagged", s:0.14, rank:"14th of 16", offers:1, self:"No",
+   log:[["7 Sept","Second consecutive week under threshold. <b>Flagged for a guaranteed look.</b>","gain"],
+        ["","Kip's card updates. Mite's phone shows the standing card and when the look lands.","gain"]]},
+  {w:"Week of 7 Sept — the look", s:0.22, rank:"11th of 16", offers:2, self:"—",
+   log:[["9 Sept","Guaranteed look routes to Mite first, ahead of two closer responders.","gain"],
+        ["","<b>90-second window</b> instead of 60. Answered at 71s — would have been a miss today.","gain"],
+        ["","+0.08 credit. First upward move since 10 August.","gain"]]},
+  {w:"Week of 14 Sept", s:0.38, rank:"8th of 16", offers:5, self:"Yes",
+   log:[["14 Sept","Back in normal ranking range. 5 offers arrive without intervention.","gain"],
+        ["","2 taken, 1 declined (genuinely unavailable), 2 unanswered.","" ],
+        ["","Net up. Second guaranteed look not needed — withdrawn automatically.","gain"]]},
+  {w:"Week of 21 Sept", s:0.50, rank:"6th of 16", offers:9, self:"Yes",
+   log:[["21 Sept","Back to neutral, on his own merits. Volume close to his July baseline.","gain"],
+        ["","Kip's two cards tell the same story again.","gain"],
+        ["","The Gale drops to 15 offers — the load flag also resolves.","gain"]]}
+];
+let step = 0;
+function renderRec(){
+  const s = STEPS[step];
+  document.getElementById('recWeek').textContent = s.w;
+  document.getElementById('recScore').textContent = s.s.toFixed(2);
+  document.getElementById('recRank').textContent = s.rank;
+  document.getElementById('recOffers').textContent = s.offers;
+  const self = document.getElementById('recSelf');
+  self.textContent = s.self;
+  self.className = s.self === "Yes" ? "ok" : (s.self === "No" ? "bad" : "warn");
+  const bar = document.getElementById('recBar');
+  bar.style.width = Math.round(s.s*100) + "%";
+  bar.style.background = s.s < .25 ? "var(--bad)" : s.s < .45 ? "var(--warn)" : "var(--ok)";
+  const pill = document.getElementById('recPill');
+  pill.textContent = s.s < .25 ? "Low" : s.s < .45 ? "Recovering" : "Normal";
+  pill.className = "pill " + (s.s < .25 ? "bad" : s.s < .45 ? "" : "ok");
+  document.getElementById('recLog').innerHTML = STEPS.slice(0, step+1).flatMap(x=>x.log)
+    .map(([w,t,c])=>`<div class="ev ${c||''}"><span class="w">${w}</span><span>${t}</span></div>`).join('');
+  document.getElementById('recBack').disabled = step === 0;
+  document.getElementById('recFwd').disabled = step === STEPS.length-1;
+}
+document.getElementById('recFwd').onclick  = ()=>{ if(step<STEPS.length-1){step++;renderRec();} };
+document.getElementById('recBack').onclick = ()=>{ if(step>0){step--;renderRec();} };
+document.getElementById('recReset').onclick= ()=>{ step=0;renderRec(); };
+renderRec();
+
+/* ---- cap redistribution ---- */
+const CAPS = [21,18,15,12];
+let cap = 15;
+function renderCap(){
+  document.getElementById('capBtns').innerHTML = CAPS.map(c=>
+    `<button class="${c===cap?'sel':''}" data-cap="${c}">${c===21?'No cap (21)':c+' / week'}</button>`
+  ).join('');
+  const over = 21 - cap;
+  const out = document.getElementById('capOut');
+  if(!over){
+    out.innerHTML = `<p class="why">No cap — The Gale keeps all 21. Kip's two cards stay as
+      far apart as they are now.</p>`;
+  } else {
+    // overflow cascades to the next-ranked responders, who are also high-standing
+    const share = [["Sgt. Falkirk",.34],["Stormwrack",.3],["Captain Vantage",.22],["Nightwell",.14]];
+    let left = over, rows = share.map(([n,f],i)=>{
+      const v = i===share.length-1 ? left : Math.max(1, Math.round(over*f));
+      left -= v; return [n, Math.max(0,v)];
+    }).filter(r=>r[1]>0);
+    out.innerHTML = `<table><tr><th>Responder</th><th>Current standing</th>
+      <th class="n">Extra callouts</th></tr>` +
+      rows.map(([n,v])=>`<tr><td>${n}</td><td><span class="pill ok">High</span></td>
+        <td class="n ok">+${v}</td></tr>`).join('') +
+      `<tr class="now"><td><b>Meteor Mite</b></td><td><span class="pill bad">Low</span></td>
+        <td class="n bad"><b>+0</b></td></tr></table>
+      <p class="why" style="margin-top:10px"><b>Capping the busiest responder does not feed
+        the quietest one.</b> The ${over} callouts cascade to whoever is next in the ranking —
+        and Meteor Mite is 14th of 16 — too far down to catch the overflow no matter how
+        hard Kip throttles The Gale.</p>`;
+  }
+  document.getElementById('capNote').innerHTML = `
+    <p><b>This is the screen that argues against itself.</b> Kip's instinct — and mine when I
+       put this button on the mock — is that relieving The Gale helps Meteor Mite. It doesn't.
+       Only something that overrides ranking does, which is the guaranteed look. The cap
+       treats the symptom on one card and changes nothing on the other.</p>
+    <p><b>Open — a cap is a coverage promise Dispatch can't keep alone.</b> If the cascade
+       runs out of high-standing responders in range, the callout goes unfilled. Nothing here
+       models that.</p>
+    <p><b>Open — whose decision is it?</b> Kip manages availability, but The Gale is the one
+       who's tired. "Exhausted" is Kip's word in a UX interview; we hold no fatigue data at
+       all.</p>`;
+}
+renderCap();
+document.getElementById('capBtns').onclick = e=>{
+  const c = e.target.dataset.cap; if(c){ cap = +c; renderCap(); }
+};
+
+/* ---- modals ---- */
+document.addEventListener('click', e=>{
+  const open = e.target.closest('[data-modal]');
+  if(open){ document.getElementById('m-'+open.dataset.modal).classList.add('on'); return; }
+  if(e.target.closest('[data-close]') || e.target.classList.contains('overlay')){
+    document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('on'));
+  }
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('on'));
+});
+
+/* ---- nav + theme ---- */
+document.querySelectorAll('nav button').forEach(b=>{
+  b.onclick = ()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on', x===b));
+    ['today','proposed','mite','phone','recover','dot','unknown'].forEach(v=>{
+      document.getElementById('v-'+v).hidden = (v !== b.dataset.v);
+    });
+    window.scrollTo(0,0);
+  };
+});
+const t = document.getElementById('theme');
+t.onclick = ()=>{
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  document.documentElement.setAttribute('data-theme', light ? 'dark' : 'light');
+  t.textContent = light ? 'Light' : 'Dark';
+};
+</script>
+</body>
+</html>
