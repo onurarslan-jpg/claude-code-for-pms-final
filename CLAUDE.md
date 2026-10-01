@@ -298,6 +298,28 @@ forgotten" — the name twice, never "he" or "she" — and cover identity isn't 
 derivable. Use the name. Earlier drafts of mine invented "he"; that's been corrected in
 both deliverables. Vesper *is* "he" — Aunt Dot uses it throughout her interview.
 
+### Review-checklist habit (session 6 — "Sidekicks")
+
+Turned my own brief-review habit into a standing check: owner named, success
+measure stated, scope at the end matches scope at the start, problem
+explained before the fix. Saved as `06-sidekicks/review-checklist.md`
+(kept local to this course directory on purpose, not a global Skill — scope
+rule for this directory says read/write only within it). Scheduled it to
+run weekly, Monday mornings (`review-checklist-weekly`), against whatever
+briefs are in the directory.
+
+First simulated run against the five existing briefs (`06-sidekicks/
+briefs/*.txt` and `05-super-speed/brief.md`) found a pattern worth
+remembering, not just a one-off: 3 of 5 had no real success measure stated
+up front (Bulk Callout and Handler Phone App had something directional but
+no baseline; Routing Override Audit Log had none at all; my own Standing
+brief buries the metric question inside "Open questions" instead of
+stating it). Also caught: Handler Phone App states the fix before the
+problem (Proposal section before "What this solves"), and Requisition
+Approval Chains scope-creeps in its own proposal section — "that's the
+whole ask" immediately followed by four more asks. Worth rereading my own
+Standing brief with this lens before it goes to Helen.
+
 ### First-month framing (my own call, not something to re-litigate each session)
 
 Decided not to make the 4.2 aftermath my sole focus. Running roughly in
