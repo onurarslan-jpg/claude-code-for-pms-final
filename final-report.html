@@ -88,6 +88,9 @@
 
   /* ---------- bits ---------- */
   .grid{display:grid;gap:18px}
+  /* grid items default to min-width:auto, which lets wide <pre> blocks
+     stretch their track past the viewport. Keep tracks shrinkable. */
+  .grid>*{min-width:0}
   .g2{grid-template-columns:repeat(2,1fr)}
   .g3{grid-template-columns:repeat(3,1fr)}
   .g4{grid-template-columns:repeat(4,1fr)}
@@ -116,6 +119,7 @@
   .code{
     background:#0d1118;border:1px solid var(--line);border-radius:12px;
     padding:16px 18px;overflow-x:auto;font-size:13px;line-height:1.65;color:#cdd6e8;margin:0;
+    max-width:100%;
   }
   .code .c{color:#5d6b85}
   .code .k{color:#7aa2ff}
