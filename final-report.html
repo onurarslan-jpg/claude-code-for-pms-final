@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rook Dispatch 4.2 — what happened, what we do about it</title>
+<style>
+  :root{
+    --bg:#0b0e14;
+    --bg2:#11151f;
+    --panel:#161b27;
+    --panel2:#1c2231;
+    --line:#2a3246;
+    --ink:#e8ecf5;
+    --ink2:#9aa6bf;
+    --ink3:#67738d;
+    --accent:#5fd3c4;
+    --accent2:#7aa2ff;
+    --warn:#ffb454;
+    --bad:#ff6b7a;
+    --good:#7ee08f;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.55;
+  }
+
+  /* ---------- chrome ---------- */
+  #progress{
+    position:fixed;top:0;left:0;height:3px;width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    z-index:100;transition:width .25s ease;
+  }
+  #rail{
+    position:fixed;right:18px;top:50%;transform:translateY(-50%);
+    z-index:90;display:flex;flex-direction:column;gap:10px;
+  }
+  #rail button{
+    width:9px;height:9px;border-radius:50%;border:0;padding:0;cursor:pointer;
+    background:#2e374d;transition:all .2s;
+  }
+  #rail button:hover{background:var(--ink3);transform:scale(1.3)}
+  #rail button.on{background:var(--accent);box-shadow:0 0 0 4px rgba(95,211,196,.15)}
+  #hint{
+    position:fixed;left:22px;bottom:18px;z-index:90;
+    font:11px/1 var(--mono);color:var(--ink3);letter-spacing:.08em;
+    background:rgba(11,14,20,.8);padding:8px 12px;border:1px solid var(--line);border-radius:20px;
+  }
+  #hint kbd{color:var(--ink2);border:1px solid var(--line);border-radius:3px;padding:1px 4px;margin:0 1px}
+
+  /* ---------- slides ---------- */
+  .slide{
+    min-height:100vh;width:100%;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:76px 7vw;
+    border-bottom:1px solid rgba(42,50,70,.5);
+    position:relative;
+    scroll-margin-top:0;
+  }
+  .slide.alt{background:linear-gradient(180deg,var(--bg2),var(--bg))}
+  .inner{width:100%;max-width:1180px;margin:0 auto}
+
+  .eyebrow{
+    font:600 11px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent);margin-bottom:18px;display:flex;align-items:center;gap:12px;
+  }
+  .eyebrow::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+  h1{font-size:clamp(34px,6vw,76px);line-height:1.02;margin:0 0 20px;letter-spacing:-.03em;font-weight:700}
+  h2{font-size:clamp(26px,3.6vw,46px);line-height:1.08;margin:0 0 16px;letter-spacing:-.025em;font-weight:650}
+  h3{font-size:19px;margin:0 0 10px;letter-spacing:-.01em;font-weight:620}
+  p{margin:0 0 14px;color:var(--ink2);font-size:clamp(15px,1.25vw,18px);max-width:70ch}
+  p strong,li strong{color:var(--ink);font-weight:620}
+  .lede{font-size:clamp(17px,1.6vw,22px);color:var(--ink);max-width:62ch}
+  .dim{color:var(--ink3)}
+  .accent{color:var(--accent)}
+  .bad{color:var(--bad)} .good{color:var(--good)} .warn{color:var(--warn)}
+
+  /* ---------- reveal ---------- */
+  .rv{opacity:0;transform:translateY(22px);transition:opacity .6s cubic-bezier(.2,.7,.3,1),transform .6s cubic-bezier(.2,.7,.3,1)}
+  .rv.in{opacity:1;transform:none}
+
+  /* ---------- bits ---------- */
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:980px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;
+    transition:border-color .25s,transform .25s,background .25s;
+  }
+  .card:hover{border-color:#3a4664;transform:translateY(-2px)}
+  .card p{font-size:15px;margin-bottom:0}
+
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+  .stat.r::before{background:var(--bad)} .stat.y::before{background:var(--warn)} .stat.g::before{background:var(--good)}
+  .stat .n{font:700 clamp(30px,4vw,48px)/1 var(--sans);letter-spacing:-.03em;display:block;margin-bottom:6px}
+  .stat .l{font-size:13.5px;color:var(--ink2);line-height:1.45}
+
+  .quote{
+    border-left:3px solid var(--accent2);padding:4px 0 4px 20px;margin:18px 0;
+    font-size:clamp(16px,1.5vw,20px);line-height:1.5;color:var(--ink);font-style:italic;max-width:60ch;
+  }
+  .quote cite{display:block;margin-top:10px;font:500 13px/1.4 var(--sans);font-style:normal;color:var(--ink3)}
+
+  pre,code{font-family:var(--mono)}
+  .code{
+    background:#0d1118;border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;overflow-x:auto;font-size:13px;line-height:1.65;color:#cdd6e8;margin:0;
+  }
+  .code .c{color:#5d6b85}
+  .code .k{color:#7aa2ff}
+  .code .s{color:var(--accent)}
+  .code .hl{background:rgba(255,107,122,.13);display:inline-block;width:100%;border-left:2px solid var(--bad);margin-left:-18px;padding-left:16px}
+  .fname{font:11px/1 var(--mono);color:var(--ink3);letter-spacing:.1em;margin-bottom:8px;text-transform:uppercase}
+
+  table{border-collapse:collapse;width:100%;font-size:14.5px;margin:6px 0}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
+  th{font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  td.num{font-family:var(--mono);font-size:13.5px}
+  tr.mark td{background:rgba(255,180,84,.07)}
+
+  .pill{
+    display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+    padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);background:var(--panel2);
+  }
+  .pill.a{color:var(--accent);border-color:rgba(95,211,196,.35);background:rgba(95,211,196,.08)}
+  .pill.r{color:var(--bad);border-color:rgba(255,107,122,.35);background:rgba(255,107,122,.08)}
+  .pill.g{color:var(--good);border-color:rgba(126,224,143,.35);background:rgba(126,224,143,.08)}
+  .pill.y{color:var(--warn);border-color:rgba(255,180,84,.35);background:rgba(255,180,84,.08)}
+
+  ul.clean{list-style:none;padding:0;margin:0}
+  ul.clean li{position:relative;padding-left:26px;margin-bottom:12px;color:var(--ink2);font-size:15.5px}
+  ul.clean li::before{content:"";position:absolute;left:4px;top:9px;width:7px;height:7px;border-radius:2px;background:var(--accent);transform:rotate(45deg)}
+  ul.clean li.x::before{background:var(--bad)}
+  ul.clean li.q::before{background:var(--warn)}
+
+  /* ---------- module cards ---------- */
+  .mod{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    display:flex;flex-direction:column;transition:border-color .25s,transform .25s;
+  }
+  .mod:hover{border-color:#3a4664;transform:translateY(-3px)}
+  .mod-hd{padding:16px 20px 14px;border-bottom:1px solid var(--line);background:var(--panel2);display:flex;align-items:baseline;gap:10px}
+  .mod-hd .num{font:700 13px/1 var(--mono);color:var(--accent);letter-spacing:.1em}
+  .mod-hd .nm{font-weight:650;font-size:16px;letter-spacing:-.01em}
+  .mod-bd{padding:18px 20px;flex:1}
+  .mod-bd .lbl{font:600 10px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px}
+  .mod-bd .finding{font-size:14.5px;color:var(--ink2);margin-bottom:18px}
+  .mod-bd .finding b{color:var(--ink)}
+  .prompt{
+    background:#0d1118;border:1px solid var(--line);border-left:3px solid var(--accent2);
+    border-radius:0 8px 8px 0;padding:13px 15px;font:13px/1.6 var(--mono);color:#b8c4dc;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .artifact{margin-top:14px;font:11px/1.5 var(--mono);color:var(--ink3);letter-spacing:.04em}
+  .artifact b{color:var(--accent);font-weight:400}
+
+  /* ---------- charts ---------- */
+  .chartwrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 26px 18px}
+  .chartwrap svg{display:block;width:100%;height:auto;overflow:visible}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:16px;font-size:13px;color:var(--ink2)}
+  .legend span{display:flex;align-items:center;gap:8px}
+  .legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
+  .ax{font:11px var(--mono);fill:var(--ink3)}
+  .gl{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+  .drawn{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);transition:stroke-dashoffset 1.4s cubic-bezier(.3,.8,.3,1)}
+  .in .drawn{stroke-dashoffset:0}
+  .dotfade{opacity:0;transition:opacity .5s ease .9s}
+  .in .dotfade{opacity:1}
+
+  /* ---------- prototype frame ---------- */
+  .frame{
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#000;
+    box-shadow:0 24px 60px rgba(0,0,0,.5);
+  }
+  .frame-bar{
+    display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--panel2);border-bottom:1px solid var(--line);
+  }
+  .frame-bar .dots{display:flex;gap:6px}
+  .frame-bar .dots i{width:10px;height:10px;border-radius:50%;background:#333c52;display:block}
+  .frame-bar .url{
+    flex:1;font:11px var(--mono);color:var(--ink3);background:#0d1118;border:1px solid var(--line);
+    border-radius:6px;padding:5px 10px;text-align:center;
+  }
+  .frame iframe{display:block;width:100%;height:560px;border:0;background:#0b0e14}
+  .btn{
+    display:inline-flex;align-items:center;gap:9px;background:var(--accent);color:#07130f;
+    font-weight:650;font-size:14.5px;padding:11px 20px;border-radius:9px;text-decoration:none;
+    transition:transform .2s,box-shadow .2s;
+  }
+  .btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(95,211,196,.28)}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(95,211,196,.4)}
+  .btn.ghost:hover{box-shadow:0 8px 24px rgba(95,211,196,.12)}
+
+  /* ---------- timeline ---------- */
+  .tl{position:relative;padding-left:34px;margin-top:12px}
+  .tl::before{content:"";position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,var(--line),var(--bad),var(--warn),var(--good))}
+  .tl-i{position:relative;margin-bottom:26px}
+  .tl-i::before{content:"";position:absolute;left:-30px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
+  .tl-i.r::before{border-color:var(--bad)}
+  .tl-i.y::before{border-color:var(--warn)}
+  .tl-i.g::before{border-color:var(--good)}
+  .tl-i .d{font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--ink3);margin-bottom:5px}
+  .tl-i .t{font-weight:620;font-size:16.5px;margin-bottom:4px}
+  .tl-i .s{font-size:14.5px;color:var(--ink2);max-width:58ch}
+
+  .kicker{
+    background:linear-gradient(135deg,rgba(95,211,196,.1),rgba(122,162,255,.06));
+    border:1px solid rgba(95,211,196,.25);border-radius:14px;padding:22px 26px;margin-top:4px;
+  }
+  .kicker p{color:var(--ink);margin:0;font-size:clamp(16px,1.5vw,19px);max-width:74ch}
+
+  .titlebg{
+    position:absolute;inset:0;overflow:hidden;pointer-events:none;opacity:.5;
+  }
+  .titlebg svg{position:absolute;right:-6%;top:50%;transform:translateY(-50%);width:62%;height:auto}
+
+  @media print{
+    .slide{min-height:auto;page-break-after:always;padding:40px}
+    #rail,#hint,#progress{display:none}
+    .rv{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<nav id="rail"></nav>
+<div id="hint"><kbd>&darr;</kbd> <kbd>&uarr;</kbd> to move &nbsp;·&nbsp; <kbd>1</kbd>–<kbd>9</kbd> to jump</div>
+
+<!-- ============ 1 · TITLE ============ -->
+<section class="slide" data-nav="Title">
+  <div class="titlebg">
+    <svg viewBox="0 0 600 400" fill="none" aria-hidden="true">
+      <path d="M20 300 L80 295 L140 300 L200 290 L260 298 L320 150 L380 230 L440 240 L500 265 L560 275"
+            stroke="#5fd3c4" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>
+      <path d="M20 180 L80 185 L140 175 L200 180 L260 172 L320 190 L380 330 L440 372 L500 384 L560 390"
+            stroke="#ff6b7a" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>
+      <path d="M20 190 L80 186 L140 192 L200 184 L260 190 L320 178 L380 120 L440 70 L500 44 L560 34"
+            stroke="#7aa2ff" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>
+      <line x1="320" y1="20" x2="320" y2="390" stroke="#67738d" stroke-width="1" stroke-dasharray="4 6"/>
+      <text x="328" y="34" fill="#67738d" font-family="ui-monospace,monospace" font-size="13">4.2 · 12 AUG</text>
+    </svg>
+  </div>
+  <div class="inner">
+    <div class="eyebrow rv">Rook Dispatch · Release 4.2 · Final report</div>
+    <h1 class="rv">Four responders<br>stopped getting<br>called.</h1>
+    <p class="lede rv">The average said we were recovering. The average was hiding them.
+      This is what release 4.2 actually did, how I found it, the fix I built, and the
+      habit that catches the next one.</p>
+    <div class="grid g4 rv" style="margin-top:38px">
+      <div class="stat r"><span class="n">54%</span><span class="l">Acceptance rate the week 4.2 shipped, down from a stable 76–78%</span></div>
+      <div class="stat g"><span class="n">73%</span><span class="l">Acceptance rate three weeks later — with zero code changes shipped</span></div>
+      <div class="stat y"><span class="n">4 of 16</span><span class="l">Responders who went to near-zero callouts and are still there</span></div>
+      <div class="stat"><span class="n">0</span><span class="l">Ways the system recovers them on its own</span></div>
+    </div>
+    <p class="dim rv" style="margin-top:34px;font-size:13.5px">
+      Onur Arslan · PM, Rook Dispatch · 1 October 2026 &nbsp;·&nbsp;
+      Six working sessions, evidence from tickets, interviews, callout data and the routing source.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 2 · WHAT HAPPENED ============ -->
+<section class="slide alt" data-nav="What happened">
+  <div class="inner">
+    <div class="eyebrow rv">Plainly</div>
+    <h2 class="rv">What happened with 4.2</h2>
+    <p class="lede rv" style="margin-bottom:30px">
+      4.2 bundled three changes. Two of them were deliberate and defensible on their own.
+      Together, with a nine-year-old defect nobody had reason to look at, they built a
+      one-way door.
+    </p>
+
+    <div class="grid g3 rv">
+      <div class="card">
+        <span class="pill y">Change 1 · deliberate</span>
+        <h3 style="margin-top:14px">Routing reweighted toward proximity</h3>
+        <p>Proximity <b class="accent">0.45 → 0.60</b>. Recent-acceptance <b class="accent">0.40 → 0.25</b>.
+          A long-standing, deliberate ask. Not a bug.</p>
+      </div>
+      <div class="card">
+        <span class="pill y">Change 2 · deliberate</span>
+        <h3 style="margin-top:14px">Callout timeout cut 90s → 60s</h3>
+        <p>Thirty fewer seconds to reach the phone. Committed in the Q3 roadmap as
+          "ping timeout tuning."</p>
+      </div>
+      <div class="card">
+        <span class="pill r">The part nobody shipped</span>
+        <h3 style="margin-top:14px">A missed phone scores as a refusal</h3>
+        <p>And the score <b>never recovers on its own</b>. An open <code>TODO</code> from
+          2019 that 4.2 turned from harmless into load-bearing.</p>
+      </div>
+    </div>
+
+    <div class="kicker rv" style="margin-top:28px">
+      <p><strong>In one sentence:</strong> 4.2 didn't break routing — it narrowed the escape
+        route from a trap that was already in the code. Fewer offers, less time to answer each one,
+        and a score that only goes back up by answering one.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 · TIMELINE ============ -->
+<section class="slide" data-nav="Timeline">
+  <div class="inner">
+    <div class="eyebrow rv">How it unfolded</div>
+    <h2 class="rv">Seven weeks, and nobody in the room</h2>
+    <div class="grid g2" style="gap:44px;align-items:start">
+      <div class="rv">
+        <div class="tl">
+          <div class="tl-i">
+            <div class="d">12 AUG</div>
+            <div class="t">4.2 ships</div>
+            <div class="s">Three bundled changes. Callout volume that week is the highest in the
+              whole dataset — 177 offers sent.</div>
+          </div>
+          <div class="tl-i r">
+            <div class="d">13 AUG — 5 SEP</div>
+            <div class="t">Tickets go up ~3×</div>
+            <div class="s">25 tickets. 16 pure "quiet stretch," 4 pure "offer timed out," 5 compound —
+              quiet, then lost the one offer that finally arrived.</div>
+          </div>
+          <div class="tl-i y">
+            <div class="d">14 AUG</div>
+            <div class="t">Marcus asks the right question. Nobody answers.</div>
+            <div class="s">"Was that meant to apply to responders who've been turning jobs down too?"
+              Wen Li was on PTO 14–24 Aug. The thread never picks it back up.</div>
+          </div>
+          <div class="tl-i">
+            <div class="d">21 AUG</div>
+            <div class="t">Priya leaves</div>
+            <div class="s">Her read: mostly seasonal, plus the timeout change. Do not revert 4.2.
+              Regroup in September. No handover overlap.</div>
+          </div>
+          <div class="tl-i g">
+            <div class="d">31 AUG</div>
+            <div class="t">The average looks fine again</div>
+            <div class="s">73% and climbing. Case closed, if the average is all you look at.</div>
+          </div>
+          <div class="tl-i" style="margin-bottom:0">
+            <div class="d">31 AUG · SAME WEEK</div>
+            <div class="t">Farlight gets zero callouts</div>
+            <div class="s">So does Meteor Mite (1), The Undertow (1), Vesper (1). Down from 12, 11, 12 and 14.</div>
+          </div>
+        </div>
+      </div>
+      <div class="rv">
+        <div class="card" style="margin-bottom:18px">
+          <span class="pill r">The inherited read</span>
+          <h3 style="margin-top:14px">"It's mostly seasonal. August is always soft."</h3>
+          <p style="margin-top:8px">Total weekly volume was flat-to-peak <b>right through release week</b>
+            and only dropped the week after. And a seasonal dip doesn't create winners —
+            this was redistribution, not softening.</p>
+          <p style="margin-top:10px" class="dim">The file covers one season, so it can't confirm or refute
+            "August is always soft" as a general claim either. It can rule it out as <i>this</i> driver.</p>
+        </div>
+        <div class="card">
+          <span class="pill a">What was actually true</span>
+          <h3 style="margin-top:14px">Two different complaints, one story</h3>
+          <p style="margin-top:8px">"Offer gone before I could answer" was expected and explained — the timeout cut.
+            "Phone never rings" was the unexplained two-thirds. They are the same mechanism, one step apart:
+            miss the 60-second window, lose score, stop getting offers.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 · THE AVERAGE ============ -->
+<section class="slide alt" data-nav="The average">
+  <div class="inner">
+    <div class="eyebrow rv">Evidence · <span class="dim">00-rook/data/callout-history.csv</span></div>
+    <h2 class="rv">The headline metric recovered on its own</h2>
+    <p class="lede rv" style="margin-bottom:26px">Acceptance rate is Dispatch's headline number, reported weekly
+      in aggregate. It crashed the week 4.2 shipped and climbed back for three straight weeks —
+      with <b>no code shipped after 4.2</b>. I checked the changelog.</p>
+
+    <div class="chartwrap rv" id="c1wrap">
+      <svg viewBox="0 0 980 340" role="img" aria-label="Weekly aggregate acceptance rate, 29 June to 31 August 2026">
+        <g id="c1"></g>
+      </svg>
+      <div class="legend">
+        <span><i style="background:#5fd3c4"></i> Weekly aggregate acceptance rate (offers taken ÷ offers sent, all 16 responders)</span>
+        <span><i style="background:#ff6b7a"></i> 4.2 ships, 12 Aug</span>
+      </div>
+    </div>
+
+    <div class="grid g3 rv" style="margin-top:22px">
+      <div class="card">
+        <h3>Why it recovered</h3>
+        <p>Self-sorting. The reweight pulls fast, reliable responders to the top, so fewer
+          offers get wasted on cascade hops. The average improves <i>because</i> the same
+          few people take everything.</p>
+      </div>
+      <div class="card">
+        <h3>And behaviour adapted</h3>
+        <p>Aunt Dot now tells Vesper's partner to keep the phone in his pocket rather than
+          upstairs, to beat the 60-second window. People fixed it themselves, uncredited.</p>
+      </div>
+      <div class="card" style="border-color:rgba(255,180,84,.4)">
+        <h3 class="warn">The trap in the number</h3>
+        <p>Recovery here is <b>evidence of the problem</b>, not evidence against it.
+          A metric that improves when concentration gets worse will never show you concentration.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 · REDISTRIBUTION ============ -->
+<section class="slide" data-nav="Redistribution">
+  <div class="inner">
+    <div class="eyebrow rv">Evidence · the same CSV, split by person</div>
+    <h2 class="rv">Underneath it, the work moved</h2>
+    <p class="lede rv" style="margin-bottom:26px">Same ten weeks. Same file. Offers sent per responder per week.
+      Five responders rise every single week after 4.2. Four collapse toward zero and keep going.
+      Nothing in the aggregate shows this.</p>
+
+    <div class="chartwrap rv" id="c2wrap">
+      <svg viewBox="0 0 980 380" role="img" aria-label="Offers sent per responder per week, winners rising and losers collapsing after 4.2">
+        <g id="c2"></g>
+      </svg>
+      <div class="legend">
+        <span><i style="background:#7ee08f"></i> Rising: The Gale, Nightwell, Stormwrack, Captain Vantage, Sgt. Falkirk</span>
+        <span><i style="background:#ff6b7a"></i> Collapsing: Farlight, Meteor Mite, The Undertow, Vesper</span>
+        <span><i style="background:#67738d"></i> Everyone else</span>
+      </div>
+    </div>
+
+    <div class="grid g2 rv" style="margin-top:22px">
+      <div class="card">
+        <h3 class="bad">Still getting worse, week over week</h3>
+        <p>This is the part that didn't recover. Farlight went 12 → 10 → 3 → 1 → 0.
+          The Gale went 13 → 15 → 17 → 20 → 21. Both of these are the same release working as designed.</p>
+      </div>
+      <div class="card">
+        <h3>It isn't geography</h3>
+        <p>The four moved in a synchronised, monotonic pattern — not the noisy up-and-down you'd get
+          from geographic luck. And Meteor Mite and The Gale have the <b>same handler, same city, same weeks</b>,
+          moving in opposite directions.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6 · MECHANISM ============ -->
+<section class="slide alt" data-nav="Mechanism">
+  <div class="inner">
+    <div class="eyebrow rv">Root cause · confirmed in <span class="dim">00-rook/code/dispatch-routing/</span></div>
+    <h2 class="rv">The one-way door, in nine lines of code</h2>
+
+    <div class="grid g2" style="gap:26px;align-items:start;margin-top:8px">
+      <div class="rv">
+        <div class="fname">config.py</div>
+        <pre class="code"><span class="c"># How long a callout offer stays on a responder's
+# phone before we give up and move to the next person.</span>
+OFFER_TIMEOUT_SECONDS = <span class="s">60</span>      <span class="c"># was 90 until 4.2</span>
+
+WEIGHT_PROXIMITY         = <span class="s">0.60</span>  <span class="c"># was 0.45 until 4.2</span>
+WEIGHT_RECENT_ACCEPTANCE = <span class="s">0.25</span>  <span class="c"># was 0.40 until 4.2</span>
+WEIGHT_CAPABILITY_MATCH  = <span class="s">0.15</span>  <span class="c"># unchanged since 4.0</span>
+
+ACCEPTANCE_CREDIT = <span class="s">0.08</span>
+DECLINE_PENALTY   = <span class="s">0.12</span></pre>
+        <p style="margin-top:14px;font-size:14.5px">The penalty is <b>1.5× the credit</b>. You need three
+          accepted callouts to undo two missed ones — and there is no reset or migration logic anywhere.
+          Everyone's existing score carried straight across the release boundary.</p>
+      </div>
+
+      <div class="rv">
+        <div class="fname">history.py</div>
+        <pre class="code"><span class="c"># TODO(wen, 2019): should this ease back toward
+# NEUTRAL_SCORE on its own after a while? For: somebody
+# who had a bad month shouldn't still be carrying it in
+# the spring. Against: if somebody has stopped taking
+# work, we probably want that to stick until they take
+# work again. Leaving it as-is for now.</span>
+<span class="k">def</span> record_declined(responder):
+    <span class="hl">"""They turned it down, <span class="bad">or we ran out of time</span></span>
+<span class="hl">    waiting. <span class="bad">Same either way</span> — we asked and we</span>
+<span class="hl">    didn't get a yes."""</span>
+    _set(responder, recent_acceptance(responder) - DECLINE_PENALTY)</pre>
+        <p style="margin-top:14px;font-size:14.5px">A phone in another room is recorded identically to
+          a refusal. And the only function that puts points back on is <code>record_accepted()</code> —
+          which requires landing an offer inside a 60-second window you're no longer being sent.</p>
+      </div>
+    </div>
+
+    <div class="kicker rv" style="margin-top:26px">
+      <p><strong>The loop:</strong> miss an offer → score drops → rank drops → fewer offers →
+        fewer chances to earn it back → the rare offer that does arrive is more likely to time out →
+        score drops further. <span class="bad">Nothing in the system reverses this.</span>
+        The only exits are a very close incident, every higher-ranked responder declining first,
+        a handler's manual override, or an engineering change.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 · KIP ============ -->
+<section class="slide" data-nav="Who it happens to">
+  <div class="inner">
+    <div class="eyebrow rv">Who this happens to</div>
+    <h2 class="rv">Two cards on one handler's screen</h2>
+    <p class="lede rv">Kip handles both Meteor Mite and The Gale. Same city, same weeks,
+      two cards side by side on his centre monitor.</p>
+
+    <div class="grid g2" style="gap:30px;align-items:start;margin-top:22px">
+      <div class="rv">
+        <table>
+          <thead>
+            <tr><th>Week</th><th>Meteor Mite</th><th>The Gale</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="num">3 Aug</td><td class="num">11 offers · 8 taken</td><td class="num">13 offers · 10 taken</td></tr>
+            <tr class="mark"><td class="num">10 Aug <span class="dim">· 4.2 ships 12th</span></td><td class="num warn">10 offers · <b>4 taken</b></td><td class="num">15 offers · 9 taken</td></tr>
+            <tr><td class="num">17 Aug</td><td class="num bad">4 offers · 1 taken</td><td class="num good">17 offers · 12 taken</td></tr>
+            <tr><td class="num">24 Aug</td><td class="num bad">2 offers · 0 taken</td><td class="num good">20 offers · 14 taken</td></tr>
+            <tr><td class="num">31 Aug</td><td class="num bad">1 offer · 0 taken</td><td class="num good">21 offers · 16 taken</td></tr>
+          </tbody>
+        </table>
+        <div class="card" style="margin-top:18px;border-color:rgba(255,180,84,.4)">
+          <h3 class="warn">The catchable week was 10 Aug, not 17 Aug</h3>
+          <p>Mite's <i>acceptance</i> collapsed a full week before the offer volume did — 10 offers,
+            4 taken, while the volume still looked completely normal. Nothing on the console changes
+            when only acceptance moves. The early warning exists in the data and on no screen.</p>
+        </div>
+      </div>
+
+      <div class="rv">
+        <div class="quote">two cards on the same screen that might as well be two different products… I don't have anything better than "hang in there, it'll pick up."
+          <cite>Kip, handler — Meteor Mite and The Gale</cite></div>
+        <div class="quote" style="border-left-color:var(--accent)">maybe something that tells me too, not just him. <b>I don't need to do anything about it. I'd just like to know.</b>
+          <cite>Aunt Dot, handler — Vesper. Unprompted, three weeks before anyone asked.</cite></div>
+        <p>Meteor Mite is texting Kip asking if something is broken. Nothing is broken.
+          Mite is being told, silently and correctly, that Mite is ranked low — and the path back
+          is accepting an offer that isn't coming.</p>
+        <p><b>Neither of them can see the score.</b> Neither can Nadia's support team.
+          Aunt Dot never filed a ticket at all — Vesper went from 14 callouts a week to 1 and she just adapted.
+          The ticket pile would never have found her.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 · MODULE TRAIL A ============ -->
+<section class="slide alt" data-nav="How I found it · 1–3">
+  <div class="inner">
+    <div class="eyebrow rv">How I got here · the prompts that produced it</div>
+    <h2 class="rv">Six sessions, six turning points</h2>
+    <p class="lede rv" style="margin-bottom:28px">One real finding per module, and the exact prompt I typed to get it —
+      verbatim, typos and all.</p>
+
+    <div class="grid g3 rv">
+      <article class="mod">
+        <div class="mod-hd"><span class="num">01</span><span class="nm">Origin Story</span></div>
+        <div class="mod-bd">
+          <div class="lbl">Finding</div>
+          <div class="finding">The investigation shouldn't be the whole job. I decided to run the
+            4.2 work <b>in parallel</b> with relationship-building, closing the missing routing-logic
+            doc, and shaping Q4 — rather than spending my first month as an incident responder.
+            That framing is now in CLAUDE.md so it doesn't get re-litigated every session.</div>
+          <div class="lbl">Exact prompt</div>
+          <div class="prompt">is fixing the issues from the 4.2 release the most prominent thing I should focus on as a PM?</div>
+          <div class="artifact">Artifact · <b>CLAUDE.md</b> — persistent working context</div>
+        </div>
+      </article>
+
+      <article class="mod">
+        <div class="mod-hd"><span class="num">02</span><span class="nm">Super Hearing</span></div>
+        <div class="mod-bd">
+          <div class="lbl">Finding</div>
+          <div class="finding">Tickets and interviews are <b>almost entirely disjoint populations</b> —
+            only one person appears in both. Tickets skew to whoever is angry enough to complain;
+            the UX interviews undersold the severity even for directly-affected responders.
+            Both piles were telling the truth. Neither was representative.</div>
+          <div class="lbl">Exact prompt</div>
+          <div class="prompt">You've now read both folders. Where do they disagree? What's loud in the interviews but rare in the tickets, and what's all over the tickets that nobody brought up in the interviews?</div>
+          <div class="artifact">Artifact · ticket themes: 16 quiet · 4 timeout · 5 compound</div>
+        </div>
+      </article>
+
+      <article class="mod">
+        <div class="mod-hd"><span class="num">03</span><span class="nm">Rewind</span></div>
+        <div class="mod-bd">
+          <div class="lbl">Finding</div>
+          <div class="finding">The feedback-loop hypothesis, confirmed against real weekly data:
+            this did <b>not</b> happen to everyone. A winner cluster rises every week while a loser
+            cluster collapses to zero. That reframed the whole thing from "acceptance is down"
+            to "the work has been redistributed, permanently."</div>
+          <div class="lbl">Exact prompt</div>
+          <div class="prompt">what causes this redistribution? is there a respondent score that causes loser cluster is not getting pings again because their scores have dropped and they not getting pings causes the score don't raise again and making this losing effect persistent?</div>
+          <div class="artifact">Artifact · the redistribution chart on the previous slide</div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9 · MODULE TRAIL B ============ -->
+<section class="slide" data-nav="How I found it · 4–6">
+  <div class="inner">
+    <div class="eyebrow rv">How I got here · continued</div>
+    <h2 class="rv">From hypothesis to source code to a shippable fix</h2>
+
+    <div class="grid g3 rv" style="margin-top:22px">
+      <article class="mod">
+        <div class="mod-hd"><span class="num">04</span><span class="nm">X-Ray Vision</span></div>
+        <div class="mod-bd">
+          <div class="lbl">Finding</div>
+          <div class="finding">Asked for every line that takes points off and every line that puts
+            them back on. Points come off in one place — <code>record_declined()</code>, which fires on
+            <code>NO_ANSWER</code> too. Points go on in exactly one place, <code>record_accepted()</code>.
+            <b>There is no third option.</b> That asymmetry is the root cause, confirmed rather than inferred.</div>
+          <div class="lbl">Exact prompt</div>
+          <div class="prompt">Find me the part of this code that takes points off somebody when they miss a ping or turn one down. Show it to me and explain it in plain English. Then find me every single thing in this code that puts points back on.</div>
+          <div class="artifact">Artifact · <b>history.py</b> / <b>config.py</b> walkthrough, slide 6</div>
+        </div>
+      </article>
+
+      <article class="mod">
+        <div class="mod-hd"><span class="num">05</span><span class="nm">Super Speed</span></div>
+        <div class="mod-bd">
+          <div class="lbl">Finding</div>
+          <div class="finding">Helen didn't want a constant quietly flipped — she wanted it from the
+            point of view of the person it happens to. Turned that into a one-pager plus a
+            <b>clickable prototype</b>, built in one sitting. Building it surfaced three things no
+            document would have: the delivery-confirmation blocker, the fact that capping the busiest
+            responder helps the quietest one by exactly zero, and that "the next callout Mite can do"
+            isn't expressible in the data model.</div>
+          <div class="lbl">Exact prompt</div>
+          <div class="prompt">Take the brief you just wrote and build me a working prototype, an actual screen I can click through, not a description of one. Save it as 05-super-speed/prototype.html, a single file I can just open in my browser. Show me where this would actually happen, and make at least one thing on it respond when I click it.</div>
+          <div class="artifact">Artifact · <b>05-super-speed/brief.md</b> + <b>prototype.html</b></div>
+        </div>
+      </article>
+
+      <article class="mod">
+        <div class="mod-hd"><span class="num">06</span><span class="nm">Sidekicks</span></div>
+        <div class="mod-bd">
+          <div class="lbl">Finding</div>
+          <div class="finding">Turned my own review habit into a reusable check and scheduled it weekly.
+            Its first run found a <b>pattern, not a one-off</b>: 3 of 5 briefs in this repo had no real
+            success measure stated up front — <b>including my own Standing brief</b>, which buries the
+            metric question inside "Open questions." The check caught its author.</div>
+          <div class="lbl">Exact prompt</div>
+          <div class="prompt">I want to save a habit as something I can reuse. When I review a brief before it goes any further, here's what I actually check for:
+- It names who owns it
+- It says how we'll know it worked
+- The scope at the end matches the scope at the start
+- It explains the problem before it proposes a fix
+
+Turn that into a skill called review-checklist, so I can point it at any brief and get the same check every time, without me explaining it again.</div>
+          <div class="artifact">Artifact · <b>06-sidekicks/review-checklist.md</b> + weekly schedule</div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 · THE FIX ============ -->
+<section class="slide alt" data-nav="The fix">
+  <div class="inner">
+    <div class="eyebrow rv">The fix · <span class="dim">05-super-speed/</span></div>
+    <h2 class="rv">Standing — what we'd build instead of changing a constant</h2>
+
+    <div class="grid g2" style="gap:34px;align-items:start;margin-top:10px">
+      <div class="rv">
+        <div class="card" style="border-color:rgba(126,224,143,.4);margin-bottom:18px">
+          <span class="pill g">Ship today · decoupled</span>
+          <h3 style="margin-top:14px">Stop scoring a missed phone as a refusal</h3>
+          <p>It's a real defect, it's correct on its own merits, and it depends on nothing below.
+            My first draft held it hostage to the bigger proposal — that was me protecting
+            the proposal over the product. <b>Let it go this afternoon.</b></p>
+        </div>
+
+        <div class="card" style="margin-bottom:14px">
+          <span class="pill a">Piece 1 · ships first, carries most of the value</span>
+          <h3 style="margin-top:12px">Standing, in plain words, with the reason</h3>
+          <p>The coverage card stops being a ping count and becomes an explanation:
+            <i>"Meteor Mite is being ranked below most nearby responders. Six missed offers since 10 Aug.
+            Standing is low and isn't recovering on its own."</i></p>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <span class="pill">Piece 2</span>
+          <h3 style="margin-top:12px">A guaranteed look</h3>
+          <p>Two weeks under threshold and Dispatch sends the next suitable callout regardless of rank —
+            at 90 seconds, not 60, because they're cold. Not automatic decay, not permanence.
+            You still earn it back; we make sure you get the chance to.</p>
+        </div>
+        <div class="card">
+          <span class="pill">Piece 3</span>
+          <h3 style="margin-top:12px">Tell the responder on their phone</h3>
+          <p>A quiet week you understand is a completely different experience from a quiet week you don't.</p>
+        </div>
+
+        <p style="margin-top:20px"><b>Why this and not a decay constant:</b> a constant fixes Mite's number
+          and teaches us nothing. The next time routing re-ranks someone into silence — mutual aid in Q4
+          will do exactly this — we'd be back here with no visibility and no recovery path.
+          Standing survives the next reweight.</p>
+
+        <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap">
+          <a class="btn" href="05-super-speed/prototype.html" target="_blank" rel="noopener">Open the prototype &rarr;</a>
+          <a class="btn ghost" href="05-super-speed/brief.md" target="_blank" rel="noopener">Read the one-pager</a>
+        </div>
+      </div>
+
+      <div class="rv">
+        <div class="frame">
+          <div class="frame-bar">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="url">05-super-speed/prototype.html — clickable, offline, single file</div>
+          </div>
+          <iframe src="05-super-speed/prototype.html" title="Standing prototype — handler console and responder phone" loading="lazy"></iframe>
+        </div>
+        <p class="dim" style="margin-top:12px;font-size:13px">Live prototype, embedded. If your browser blocks
+          local iframes, use the button to open it directly.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 11 · HONEST LIST ============ -->
+<section class="slide" data-nav="What's not solved">
+  <div class="inner">
+    <div class="eyebrow rv">The honest list</div>
+    <h2 class="rv">What building it surfaced that writing it never would</h2>
+    <p class="lede rv" style="margin-bottom:26px">These are not caveats. Three of them are reasons the proposal
+      isn't ready, and one of them is a prerequisite that outranks the whole thing.</p>
+
+    <div class="grid g2 rv">
+      <div class="card" style="border-color:rgba(255,107,122,.4)">
+        <span class="pill r">Blocker · Marcus, before anything</span>
+        <h3 style="margin-top:12px">We can't prove an offer was ever delivered</h3>
+        <p><code>push_to_device()</code> returns nothing. Dispatch knows only that it <i>sent</i>.
+          Every "N offers reached you" in my prototype is a claim the system cannot make —
+          and if Nightwell and Ironvale are delivery faults, standing shows them a
+          <b>well-designed lie</b>.</p>
+      </div>
+      <div class="card" style="border-color:rgba(255,180,84,.4)">
+        <span class="pill y">Counter-intuitive · have this ready</span>
+        <h3 style="margin-top:12px">Capping the busiest responder helps the quietest by zero</h3>
+        <p>Throttle The Gale and the overflow cascades to the next-ranked high-standing responders —
+          Falkirk, Stormwrack, Vantage, Nightwell. Meteor Mite, 14th of 16, gets <b>+0</b>.
+          It's the first fix anyone proposes and it silently fails.</p>
+      </div>
+      <div class="card">
+        <span class="pill y">Unpriced</span>
+        <h3 style="margin-top:12px">A guaranteed look is taken from the incident</h3>
+        <p>Mite at 34 minutes instead of someone at 6, plus 90 seconds before the cascade.
+          That's a safety trade and I costed it at zero. It also lowers acceptance rate
+          <i>on purpose</i> — Ravi's headline weekly number. Needs a segmented metric or an explicit agreement.</p>
+      </div>
+      <div class="card">
+        <span class="pill y">Scale &amp; scope</span>
+        <h3 style="margin-top:12px">My own threshold flags 4 of 16 at once</h3>
+        <p>That's a second routing policy, not a safety valve, and contention between competing
+          guaranteed looks is undefined. The 90s also partially reverses a committed 4.2 decision —
+          Helen's call, not an implementation detail.</p>
+      </div>
+      <div class="card">
+        <span class="pill">Undefined</span>
+        <h3 style="margin-top:12px">"The next callout Mite can do" isn't expressible</h3>
+        <p><code>capability_score</code> is partial credit, <code>rank_for_callout</code> never filters
+          ("Nobody is removed here"), and callouts carry no severity field.
+          This is a data-model change, not a config change.</p>
+      </div>
+      <div class="card">
+        <span class="pill">Open questions · still unanswered</span>
+        <h3 style="margin-top:12px">Two data-integrity anomalies, and Wen Li</h3>
+        <p>Nightwell and Ironvale both filed "no callouts" tickets during the exact weeks the backend
+          shows them at record volume — likely notification delivery, not routing. And Marcus's
+          14 Aug question to Wen Li has never been answered. Messages drafted, not yet sent.</p>
+      </div>
+    </div>
+
+    <p class="dim rv" style="margin-top:22px;font-size:14px">
+      <b>Meteor Mite has no pronoun in any source.</b> Kip says "Mite thinks Mite's been forgotten" —
+      the name twice, never "he" or "she." Cover identity is never stored or derivable.
+      Earlier drafts of mine invented one; corrected in both deliverables.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 12 · THE HABIT ============ -->
+<section class="slide alt" data-nav="The habit">
+  <div class="inner">
+    <div class="eyebrow rv">So it doesn't happen again</div>
+    <h2 class="rv">The habit that catches the next one</h2>
+    <p class="lede rv">4.2 wasn't a bad decision. It was three reasonable decisions shipped together,
+      with nobody holding the question "who does this make worse?" The fix for that isn't vigilance.
+      It's a check that runs whether or not I remember to run it.</p>
+
+    <div class="grid g2" style="gap:30px;align-items:start;margin-top:26px">
+      <div class="rv">
+        <div class="fname">06-sidekicks/review-checklist.md · runs every Monday morning</div>
+        <div class="card" style="padding:26px">
+          <ul class="clean" style="margin-bottom:0">
+            <li><b>Owner named</b> — not "the team," a person.</li>
+            <li><b>Success defined</b> — a metric, a signal, a threshold. Not a description of the fix.</li>
+            <li><b>Scope holds</b> — the scope at the end matches the scope at the start.</li>
+            <li><b>Problem before fix</b> — flag any brief that opens with the solution and backfills the problem.</li>
+          </ul>
+        </div>
+        <p style="margin-top:18px">Point it at any brief and get the same four questions, every time,
+          without re-explaining them. Scheduled <code>review-checklist-weekly</code>, Monday mornings,
+          against whatever briefs are in the directory. Nothing has to be ready for it to fire —
+          the point is the habit, not the result.</p>
+      </div>
+
+      <div class="rv">
+        <div class="fname">First run · five briefs · what it found</div>
+        <div class="card" style="border-color:rgba(255,180,84,.4);margin-bottom:16px">
+          <span class="pill r">3 of 5 failed the same check</span>
+          <h3 style="margin-top:12px">No real success measure stated up front</h3>
+          <p>Bulk Callout and Handler Phone App had something directional but no baseline.
+            Routing Override Audit Log had none at all. <b>And my own Standing brief</b> buries
+            the metric question inside "Open questions" rather than stating it.</p>
+        </div>
+        <ul class="clean">
+          <li class="x"><b>Handler Phone App</b> states the fix before the problem — Proposal section sits above "What this solves."</li>
+          <li class="x"><b>Requisition Approval Chains</b> scope-creeps inside its own proposal: "that's the whole ask," immediately followed by four more asks.</li>
+          <li class="q"><b>The useful part:</b> this is a pattern across the team's briefs, not a one-off. A one-off you fix. A pattern you build a check for.</li>
+        </ul>
+        <div class="kicker" style="margin-top:20px">
+          <p>The check caught its author. That's the only real evidence it works —
+            I'm rereading the Standing brief with this lens before it goes to Helen.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 13 · ASK ============ -->
+<section class="slide" data-nav="The ask">
+  <div class="inner">
+    <div class="eyebrow rv">Where this lands</div>
+    <h2 class="rv">The ask</h2>
+
+    <div class="grid g2" style="gap:34px;align-items:start;margin-top:14px">
+      <div class="rv">
+        <div class="card" style="border-color:rgba(126,224,143,.45);margin-bottom:18px">
+          <span class="pill g">Now · no approval needed beyond Marcus</span>
+          <h3 style="margin-top:12px">Ship the arithmetic fix, decoupled from everything else</h3>
+          <p>Stop recording <code>NO_ANSWER</code> as a decline. It's a defect, it's correct on its own,
+            and holding it hostage to the bigger proposal was the wrong instinct.</p>
+        </div>
+        <ul class="clean">
+          <li><b>Marcus</b> — delivery confirmation on <code>push_to_device()</code>. Prerequisite for standing,
+            and the answer to Nightwell and Ironvale either way.</li>
+          <li><b>Wen Li</b> — one consolidated message: did the reweight apply to already-low responders,
+            and how does location actually get retrieved for proximity scoring?</li>
+          <li><b>Ravi</b> — check the 4-of-16 threshold against real scores, and agree a segmented
+            acceptance metric before anything deliberately lowers the headline number.</li>
+          <li><b>Sofia</b> — the standing card, with Aunt Dot's kitchen-counter setup as a hard constraint.</li>
+          <li><b>Helen</b> — the 90s partially reverses a committed 4.2 decision. Your call.
+            Plus: which Q3 items got squeezed out of 4.2 and quietly slipped?</li>
+        </ul>
+      </div>
+
+      <div class="rv">
+        <div class="kicker" style="margin-bottom:20px">
+          <p><strong>At the September regroup:</strong> the investigation and the proposal as
+            <i>one story</i>, not two. The 4.2 decision was right. The thing it landed on top of was not.</p>
+        </div>
+        <div class="grid g2" style="gap:14px">
+          <div class="stat g"><span class="n">1</span><span class="l">Fix shippable this afternoon</span></div>
+          <div class="stat r"><span class="n">1</span><span class="l">Blocker that outranks the proposal</span></div>
+          <div class="stat y"><span class="n">4</span><span class="l">Responders still at near-zero</span></div>
+          <div class="stat"><span class="n">0</span><span class="l">Of them can see why</span></div>
+        </div>
+        <p class="dim" style="margin-top:28px;font-size:13.5px">
+          Sources: <code>00-rook/data/callout-history.csv</code> · <code>00-rook/feedback/tickets/</code> (t-001–t-025) ·
+          <code>00-rook/feedback/interviews/</code> · <code>00-rook/code/dispatch-routing/</code> ·
+          <code>05-super-speed/</code> · <code>06-sidekicks/</code> · prompt libraries in
+          <code>01-origin-story/</code> through <code>06-sidekicks/prompts.md</code>.
+        </p>
+        <p class="dim" style="font-size:13.5px">
+          Rook Industries is a fictional teaching scenario — Product School, "Claude Code for PMs," cohort ccpm-2026.1.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- data ---------- */
+  var weeks = ["29 Jun","6 Jul","13 Jul","20 Jul","27 Jul","3 Aug","10 Aug","17 Aug","24 Aug","31 Aug"];
+  var rate  = [76.7,77.1,76.4,75.0,77.6,77.9,54.2,65.8,66.7,72.7];
+
+  var series = [
+    {n:"The Gale",        v:[13,12,13,14,13,13,15,17,20,21], g:"win"},
+    {n:"Nightwell",       v:[15,14,15,16,15,15,16,18,20,21], g:"win"},
+    {n:"Stormwrack",      v:[13,13,12,14,13,13,14,16,18,19], g:"win"},
+    {n:"Captain Vantage", v:[12,13,12,11,12,12,13,15,17,18], g:"win"},
+    {n:"Sgt. Falkirk",    v:[10,10,11,10, 9,10,11,13,15,16], g:"win"},
+    {n:"Cindermark",      v:[ 9, 9, 8,10, 9, 9,10,11,12,12], g:"mid"},
+    {n:"Ironvale",        v:[ 8, 8, 9, 8, 7, 8, 9,10,11,12], g:"mid"},
+    {n:"Sgt. Bulwark",    v:[ 9, 9,10, 9, 8, 9,10,10,11,11], g:"mid"},
+    {n:"Halfmoon",        v:[11,10,11,12,11,11,11, 9, 8, 8], g:"mid"},
+    {n:"The Drift",       v:[ 6, 6, 7, 6, 6, 6, 7, 7, 8, 8], g:"mid"},
+    {n:"The Longcast",    v:[ 7, 7, 8, 7, 7, 7, 8, 8, 9, 9], g:"mid"},
+    {n:"Cpl. Ashgrove",   v:[10,11,10, 9,10,10,10, 8, 7, 7], g:"mid"},
+    {n:"Vesper",          v:[14,13,15,14,13,14,12, 5, 2, 1], g:"lose"},
+    {n:"The Undertow",    v:[12,11,12,13,12,12,11, 4, 1, 0], g:"lose"},
+    {n:"Farlight",        v:[12,12,11,12,13,12,10, 3, 1, 0], g:"lose"},
+    {n:"Meteor Mite",     v:[11,12,10,11,12,11,10, 4, 2, 1], g:"lose"}
+  ];
+
+  var NS = "http://www.w3.org/2000/svg";
+  function el(t,a){var e=document.createElementNS(NS,t);for(var k in a){if(a[k]!==null&&a[k]!==undefined)e.setAttribute(k,a[k]);}return e;}
+  function txt(x,y,s,cls,anchor){var t=el("text",{x:x,y:y,"class":cls||"ax","text-anchor":anchor||"middle"});t.textContent=s;return t;}
+  function path(pts){return pts.map(function(p,i){return (i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1);}).join(" ");}
+
+  /* ---------- chart 1: acceptance rate ---------- */
+  (function(){
+    var g=document.getElementById("c1");
+    var W=980,H=340,L=56,R=24,T=22,B=42;
+    var pw=W-L-R, ph=H-T-B;
+    var yMin=45, yMax=85;
+    var X=function(i){return L+(pw*i)/(weeks.length-1);};
+    var Y=function(v){return T+ph-((v-yMin)/(yMax-yMin))*ph;};
+
+    for(var v=50;v<=85;v+=5){
+      g.appendChild(el("line",{x1:L,y1:Y(v),x2:W-R,y2:Y(v),"class":"gl"}));
+      g.appendChild(txt(L-12,Y(v)+4,v+"%","ax","end"));
+    }
+    weeks.forEach(function(w,i){ g.appendChild(txt(X(i),H-14,w)); });
+
+    /* pre-release stable band */
+    g.appendChild(el("rect",{x:L,y:Y(78.5),width:X(5)-L,height:Y(74.5)-Y(78.5),fill:"#5fd3c4","fill-opacity":".07",rx:3}));
+    g.appendChild(txt((L+X(5))/2,Y(78.5)-10,"stable · 76–78% for six weeks","ax"));
+
+    /* release marker */
+    var rx=(X(5)+X(6))/2;
+    g.appendChild(el("line",{x1:rx,y1:T-6,x2:rx,y2:T+ph,stroke:"#ff6b7a","stroke-width":1.5,"stroke-dasharray":"5 5"}));
+    var rl=txt(rx+8,T+6,"4.2 ships","ax","start"); rl.setAttribute("fill","#ff6b7a"); g.appendChild(rl);
+
+    var pts=rate.map(function(v,i){return [X(i),Y(v)];});
+
+    /* area */
+    var area=el("path",{d:path(pts)+" L"+X(9)+" "+(T+ph)+" L"+L+" "+(T+ph)+" Z",fill:"url(#grad1)","class":"dotfade"});
+    var defs=el("defs");
+    var lg=el("linearGradient",{id:"grad1",x1:"0",y1:"0",x2:"0",y2:"1"});
+    lg.appendChild(el("stop",{offset:"0%","stop-color":"#5fd3c4","stop-opacity":".26"}));
+    lg.appendChild(el("stop",{offset:"100%","stop-color":"#5fd3c4","stop-opacity":"0"}));
+    defs.appendChild(lg); g.appendChild(defs); g.appendChild(area);
+
+    var line=el("path",{d:path(pts),fill:"none",stroke:"#5fd3c4","stroke-width":3,"stroke-linecap":"round","stroke-linejoin":"round","class":"drawn"});
+    g.appendChild(line);
+    requestAnimationFrame(function(){ try{ line.style.setProperty("--len", line.getTotalLength()); }catch(e){} });
+
+    rate.forEach(function(v,i){
+      var c=el("circle",{cx:X(i),cy:Y(v),r:(i===6?6:4.5),fill:(i===6?"#ff6b7a":"#5fd3c4"),stroke:"#0b0e14","stroke-width":2,"class":"dotfade"});
+      g.appendChild(c);
+      if(i===6||i===9||i===5){
+        var t=txt(X(i),Y(v)+(i===6?24:-16),v.toFixed(1)+"%","dotfade ax");
+        t.setAttribute("fill",i===6?"#ff6b7a":"#e8ecf5");
+        t.setAttribute("font-size","14"); t.setAttribute("font-weight","600");
+        g.appendChild(t);
+      }
+    });
+  })();
+
+  /* ---------- chart 2: redistribution ---------- */
+  (function(){
+    var g=document.getElementById("c2");
+    var W=980,H=380,L=52,R=128,T=20,B=42;
+    var pw=W-L-R, ph=H-T-B;
+    var yMax=22;
+    var X=function(i){return L+(pw*i)/(weeks.length-1);};
+    var Y=function(v){return T+ph-(v/yMax)*ph;};
+
+    for(var v=0;v<=20;v+=5){
+      g.appendChild(el("line",{x1:L,y1:Y(v),x2:W-R,y2:Y(v),"class":"gl"}));
+      g.appendChild(txt(L-12,Y(v)+4,v,"ax","end"));
+    }
+    var yl=txt(0,0,"offers sent / week","ax","middle");
+    yl.setAttribute("transform","translate(16,"+(T+ph/2)+") rotate(-90)");
+    g.appendChild(yl);
+    weeks.forEach(function(w,i){ g.appendChild(txt(X(i),H-14,w)); });
+
+    var rx=(X(5)+X(6))/2;
+    g.appendChild(el("rect",{x:rx,y:T,width:(W-R)-rx,height:ph,fill:"#ff6b7a","fill-opacity":".035"}));
+    g.appendChild(el("line",{x1:rx,y1:T-4,x2:rx,y2:T+ph,stroke:"#ff6b7a","stroke-width":1.5,"stroke-dasharray":"5 5"}));
+    var rl=txt(rx+8,T+12,"4.2 ships","ax","start"); rl.setAttribute("fill","#ff6b7a"); g.appendChild(rl);
+
+    var style={win:{c:"#7ee08f",w:2.4,o:1},lose:{c:"#ff6b7a",w:2.6,o:1},mid:{c:"#67738d",w:1.2,o:.42}};
+    var lines=[];
+    ["mid","win","lose"].forEach(function(grp){
+      series.filter(function(s){return s.g===grp;}).forEach(function(s){
+        var st=style[grp];
+        var pts=s.v.map(function(v,i){return [X(i),Y(v)];});
+        var p=el("path",{d:path(pts),fill:"none",stroke:st.c,"stroke-width":st.w,"stroke-opacity":st.o,
+                         "stroke-linecap":"round","stroke-linejoin":"round","class":"drawn"});
+        g.appendChild(p); lines.push(p);
+
+        if(grp!=="mid"){
+          var last=s.v[9];
+          var lbl=txt(X(9)+10,Y(last)+4,s.n+"  "+last,"dotfade ax","start");
+          lbl.setAttribute("fill",st.c); lbl.setAttribute("font-size","12");
+          lbl.setAttribute("font-weight","600");
+          g.appendChild(lbl);
+          g.appendChild(el("circle",{cx:X(9),cy:Y(last),r:3.5,fill:st.c,"class":"dotfade"}));
+        }
+      });
+    });
+    requestAnimationFrame(function(){
+      lines.forEach(function(p){ try{ p.style.setProperty("--len", p.getTotalLength()); }catch(e){} });
+    });
+
+    /* nudge overlapping end-labels apart, then keep them inside the plot */
+    requestAnimationFrame(function(){
+      var GAP=13, top=T+8, bottom=T+ph+2, i;
+      var labels=Array.prototype.slice.call(g.querySelectorAll("text.dotfade"));
+      labels.sort(function(a,b){return (+a.getAttribute("y"))-(+b.getAttribute("y"));});
+      for(i=1;i<labels.length;i++){
+        var prev=+labels[i-1].getAttribute("y");
+        if((+labels[i].getAttribute("y"))-prev<GAP) labels[i].setAttribute("y",prev+GAP);
+      }
+      for(i=labels.length-1;i>=0;i--){
+        var y=Math.min(+labels[i].getAttribute("y"), bottom-(labels.length-1-i)*GAP);
+        labels[i].setAttribute("y", Math.max(y, top+i*GAP));
+      }
+    });
+  })();
+
+  /* ---------- reveal on scroll ---------- */
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
+  },{threshold:.12,rootMargin:"0px 0px -8% 0px"});
+  var rvs=document.querySelectorAll(".rv");
+  for(var i=0;i<rvs.length;i++){
+    rvs[i].style.transitionDelay=(Math.min(i%5,4)*70)+"ms";
+    io.observe(rvs[i]);
+  }
+
+  /* ---------- nav ---------- */
+  var slides=Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var rail=document.getElementById("rail");
+  slides.forEach(function(s,i){
+    var b=document.createElement("button");
+    b.title=(i+1)+" · "+(s.dataset.nav||"");
+    b.setAttribute("aria-label","Go to slide "+(i+1)+": "+(s.dataset.nav||""));
+    b.onclick=function(){ s.scrollIntoView({behavior:"smooth"}); };
+    rail.appendChild(b);
+  });
+  var dots=rail.querySelectorAll("button");
+  var bar=document.getElementById("progress");
+
+  function current(){
+    var best=0,bd=Infinity;
+    slides.forEach(function(s,i){
+      var d=Math.abs(s.getBoundingClientRect().top);
+      if(d<bd){bd=d;best=i;}
+    });
+    return best;
+  }
+  function sync(){
+    var c=current();
+    for(var i=0;i<dots.length;i++) dots[i].classList.toggle("on",i===c);
+    var h=document.documentElement;
+    var max=h.scrollHeight-h.clientHeight;
+    bar.style.width=(max>0?(h.scrollTop/max)*100:0)+"%";
+  }
+  var tick=false;
+  window.addEventListener("scroll",function(){
+    if(!tick){ tick=true; requestAnimationFrame(function(){ sync(); tick=false; }); }
+  },{passive:true});
+  sync();
+
+  document.addEventListener("keydown",function(e){
+    if(/^(INPUT|TEXTAREA|IFRAME)$/.test(document.activeElement.tagName)) return;
+    var c=current(), t=null;
+    if(e.key==="ArrowDown"||e.key==="PageDown"||e.key===" ") t=Math.min(c+1,slides.length-1);
+    else if(e.key==="ArrowUp"||e.key==="PageUp") t=Math.max(c-1,0);
+    else if(e.key==="Home") t=0;
+    else if(e.key==="End") t=slides.length-1;
+    else if(/^[1-9]$/.test(e.key)) t=Math.min(parseInt(e.key,10)-1,slides.length-1);
+    if(t!==null){ e.preventDefault(); slides[t].scrollIntoView({behavior:"smooth"}); }
+  });
+
+  setTimeout(function(){
+    var h=document.getElementById("hint");
+    if(h){ h.style.transition="opacity .8s"; h.style.opacity="0"; }
+  },7000);
+})();
+</script>
+</body>
+</html>
