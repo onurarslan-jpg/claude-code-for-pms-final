@@ -3,1102 +3,848 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rook Dispatch 4.2 — what happened, what we do about it</title>
+<title>Four responders stopped getting called — Rook Dispatch 4.2</title>
 <style>
   :root{
-    --bg:#0b0e14;
-    --bg2:#11151f;
-    --panel:#161b27;
-    --panel2:#1c2231;
-    --line:#2a3246;
-    --ink:#e8ecf5;
-    --ink2:#9aa6bf;
-    --ink3:#67738d;
-    --accent:#5fd3c4;
-    --accent2:#7aa2ff;
-    --warn:#ffb454;
-    --bad:#ff6b7a;
-    --good:#7ee08f;
+    --bg:#0b0e14; --bg2:#11151f; --panel:#161b27; --panel2:#1c2231;
+    --line:#2a3246; --ink:#e8ecf5; --ink2:#9aa6bf; --ink3:#67738d;
+    --accent:#5fd3c4; --accent2:#7aa2ff; --warn:#ffb454;
+    --bad:#ff6b7a; --good:#7ee08f;
     --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
-  body{
-    background:var(--bg);
-    color:var(--ink);
-    font-family:var(--sans);
-    -webkit-font-smoothing:antialiased;
-    line-height:1.55;
-  }
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+       -webkit-font-smoothing:antialiased;line-height:1.55}
 
-  /* ---------- chrome ---------- */
-  #progress{
-    position:fixed;top:0;left:0;height:3px;width:0%;
-    background:linear-gradient(90deg,var(--accent),var(--accent2));
-    z-index:100;transition:width .25s ease;
-  }
-  #rail{
-    position:fixed;right:18px;top:50%;transform:translateY(-50%);
-    z-index:90;display:flex;flex-direction:column;gap:10px;
-  }
-  #rail button{
-    width:9px;height:9px;border-radius:50%;border:0;padding:0;cursor:pointer;
-    background:#2e374d;transition:all .2s;
-  }
-  #rail button:hover{background:var(--ink3);transform:scale(1.3)}
-  #rail button.on{background:var(--accent);box-shadow:0 0 0 4px rgba(95,211,196,.15)}
-  #hint{
-    position:fixed;left:22px;bottom:18px;z-index:90;
-    font:11px/1 var(--mono);color:var(--ink3);letter-spacing:.08em;
-    background:rgba(11,14,20,.8);padding:8px 12px;border:1px solid var(--line);border-radius:20px;
-  }
-  #hint kbd{color:var(--ink2);border:1px solid var(--line);border-radius:3px;padding:1px 4px;margin:0 1px}
+  /* chrome */
+  #progress{position:fixed;top:0;left:0;height:3px;width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));z-index:200;transition:width .2s ease}
+  #dots{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:200;
+    display:flex;flex-direction:column;gap:9px}
+  #dots a{width:8px;height:8px;border-radius:50%;background:#2b3448;
+    display:block;transition:all .2s;border:0;padding:0}
+  #dots a.on{background:var(--accent);transform:scale(1.5)}
+  #dots a:hover{background:var(--accent2)}
+  @media(max-width:900px){#dots{display:none}}
 
-  /* ---------- slides ---------- */
-  .slide{
-    min-height:100vh;width:100%;
-    display:flex;flex-direction:column;justify-content:center;
-    padding:76px 7vw;
-    border-bottom:1px solid rgba(42,50,70,.5);
-    position:relative;
-    scroll-margin-top:0;
-  }
-  .slide.alt{background:linear-gradient(180deg,var(--bg2),var(--bg))}
-  .inner{width:100%;max-width:1180px;margin:0 auto}
+  section{min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:72px 28px;position:relative;scroll-margin-top:0}
+  .wrap{width:100%;max-width:1060px}
+  section:nth-child(even of section){background:var(--bg2)}
+  .alt{background:var(--bg2)}
 
-  .eyebrow{
-    font:600 11px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;
-    color:var(--accent);margin-bottom:18px;display:flex;align-items:center;gap:12px;
-  }
-  .eyebrow::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
-  h1{font-size:clamp(34px,6vw,76px);line-height:1.02;margin:0 0 20px;letter-spacing:-.03em;font-weight:700}
-  h2{font-size:clamp(26px,3.6vw,46px);line-height:1.08;margin:0 0 16px;letter-spacing:-.025em;font-weight:650}
-  h3{font-size:19px;margin:0 0 10px;letter-spacing:-.01em;font-weight:620}
-  p{margin:0 0 14px;color:var(--ink2);font-size:clamp(15px,1.25vw,18px);max-width:70ch}
-  p strong,li strong{color:var(--ink);font-weight:620}
-  .lede{font-size:clamp(17px,1.6vw,22px);color:var(--ink);max-width:62ch}
+  .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 18px}
+  .eyebrow .n{color:var(--ink3);margin-right:10px}
+  h1{font-size:clamp(34px,6.4vw,70px);line-height:1.02;margin:0 0 20px;letter-spacing:-.025em;font-weight:800}
+  h2{font-size:clamp(26px,4vw,44px);line-height:1.08;margin:0 0 16px;letter-spacing:-.02em;font-weight:750}
+  h3{font-size:16px;margin:0 0 8px;font-weight:650}
+  p{margin:0 0 14px;color:var(--ink2);font-size:clamp(15px,1.55vw,17.5px);max-width:72ch}
+  .lede{font-size:clamp(17px,2.1vw,22px);color:var(--ink);max-width:62ch}
+  strong{color:var(--ink);font-weight:650}
   .dim{color:var(--ink3)}
-  .accent{color:var(--accent)}
-  .bad{color:var(--bad)} .good{color:var(--good)} .warn{color:var(--warn)}
+  .mono{font-family:var(--mono)}
 
-  /* ---------- reveal ---------- */
-  .rv{opacity:0;transform:translateY(22px);transition:opacity .6s cubic-bezier(.2,.7,.3,1),transform .6s cubic-bezier(.2,.7,.3,1)}
-  .rv.in{opacity:1;transform:none}
-
-  /* ---------- bits ---------- */
   .grid{display:grid;gap:18px}
-  /* grid items default to min-width:auto, which lets wide <pre> blocks
-     stretch their track past the viewport. Keep tracks shrinkable. */
   .grid>*{min-width:0}
   .g2{grid-template-columns:repeat(2,1fr)}
   .g3{grid-template-columns:repeat(3,1fr)}
   .g4{grid-template-columns:repeat(4,1fr)}
-  @media(max-width:980px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  @media(max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr}}
 
-  .card{
-    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;
-    transition:border-color .25s,transform .25s,background .25s;
-  }
-  .card:hover{border-color:#3a4664;transform:translateY(-2px)}
-  .card p{font-size:15px;margin-bottom:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+  .card p{font-size:14.5px;margin:0}
+  .card p+p{margin-top:9px}
 
-  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden}
-  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
-  .stat.r::before{background:var(--bad)} .stat.y::before{background:var(--warn)} .stat.g::before{background:var(--good)}
-  .stat .n{font:700 clamp(30px,4vw,48px)/1 var(--sans);letter-spacing:-.03em;display:block;margin-bottom:6px}
-  .stat .l{font-size:13.5px;color:var(--ink2);line-height:1.45}
+  .stat{font:800 clamp(30px,4.6vw,52px)/1 var(--sans);letter-spacing:-.03em;display:block;margin-bottom:6px}
+  .stat.bad{color:var(--bad)} .stat.good{color:var(--good)}
+  .stat.warn{color:var(--warn)} .stat.acc{color:var(--accent)}
+  .cap{font:600 11px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
 
-  .quote{
-    border-left:3px solid var(--accent2);padding:4px 0 4px 20px;margin:18px 0;
-    font-size:clamp(16px,1.5vw,20px);line-height:1.5;color:var(--ink);font-style:italic;max-width:60ch;
-  }
-  .quote cite{display:block;margin-top:10px;font:500 13px/1.4 var(--sans);font-style:normal;color:var(--ink3)}
+  .pill{display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+    padding:6px 11px;border-radius:999px;border:1px solid var(--line);color:var(--ink2);background:#0e121b}
+  .pill.ship{border-color:#2f6b55;color:var(--good);background:#0f1a16}
+  .pill.block{border-color:#6b3540;color:var(--bad);background:#1a1013}
+  .pill.next{border-color:#5a4520;color:var(--warn);background:#1a1510}
 
-  pre,code{font-family:var(--mono)}
-  .code{
-    background:#0d1118;border:1px solid var(--line);border-radius:12px;
-    padding:16px 18px;overflow-x:auto;font-size:13px;line-height:1.65;color:#cdd6e8;margin:0;
-    max-width:100%;
-  }
-  .code .c{color:#5d6b85}
-  .code .k{color:#7aa2ff}
-  .code .s{color:var(--accent)}
-  .code .hl{background:rgba(255,107,122,.13);display:inline-block;width:100%;border-left:2px solid var(--bad);margin-left:-18px;padding-left:16px}
-  .fname{font:11px/1 var(--mono);color:var(--ink3);letter-spacing:.1em;margin-bottom:8px;text-transform:uppercase}
+  pre.code{font-family:var(--mono);font-size:12.5px;line-height:1.65;background:#0a0d14;
+    border:1px solid var(--line);border-left:3px solid var(--bad);border-radius:10px;
+    padding:14px 16px;overflow-x:auto;max-width:100%;color:#c6d0e4;margin:0}
+  pre.code .c{color:#5c6880} pre.code .k{color:var(--accent2)}
+  pre.code .hi{color:var(--bad);font-weight:600} pre.code .s{color:var(--warn)}
 
-  table{border-collapse:collapse;width:100%;font-size:14.5px;margin:6px 0}
-  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
-  th{font:600 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
-  td.num{font-family:var(--mono);font-size:13.5px}
-  tr.mark td{background:rgba(255,180,84,.07)}
+  blockquote{margin:0;padding:16px 20px;border-left:3px solid var(--accent2);
+    background:#121725;border-radius:0 10px 10px 0;color:var(--ink);font-size:16px}
+  blockquote cite{display:block;margin-top:9px;font-style:normal;font-size:12.5px;color:var(--ink3);
+    font-family:var(--mono)}
 
-  .pill{
-    display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
-    padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);background:var(--panel2);
-  }
-  .pill.a{color:var(--accent);border-color:rgba(95,211,196,.35);background:rgba(95,211,196,.08)}
-  .pill.r{color:var(--bad);border-color:rgba(255,107,122,.35);background:rgba(255,107,122,.08)}
-  .pill.g{color:var(--good);border-color:rgba(126,224,143,.35);background:rgba(126,224,143,.08)}
-  .pill.y{color:var(--warn);border-color:rgba(255,180,84,.35);background:rgba(255,180,84,.08)}
+  .prompt{background:#0a0d14;border:1px solid var(--line);border-radius:12px;padding:0;overflow:hidden}
+  .prompt .ph{display:flex;align-items:center;gap:8px;padding:9px 14px;background:#121725;
+    border-bottom:1px solid var(--line);font:600 10.5px/1 var(--mono);letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink3)}
+  .prompt .ph b{color:var(--accent);font-weight:700}
+  .prompt .pb{padding:14px;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#cfe3de}
+  .prompt .pb::before{content:"> ";color:var(--accent)}
+  .prompt .po{padding:12px 14px;border-top:1px solid var(--line);background:#0d1119;
+    font-size:13.5px;color:var(--ink2)}
+  .prompt .po b{color:var(--ink)}
 
-  ul.clean{list-style:none;padding:0;margin:0}
-  ul.clean li{position:relative;padding-left:26px;margin-bottom:12px;color:var(--ink2);font-size:15.5px}
-  ul.clean li::before{content:"";position:absolute;left:4px;top:9px;width:7px;height:7px;border-radius:2px;background:var(--accent);transform:rotate(45deg)}
-  ul.clean li.x::before{background:var(--bad)}
-  ul.clean li.q::before{background:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{font:600 10.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+  td.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr.flip td{color:var(--bad)} tr.rise td.num:last-child{color:var(--good)}
 
-  /* ---------- module cards ---------- */
-  .mod{
-    background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;
-    display:flex;flex-direction:column;transition:border-color .25s,transform .25s;
-  }
-  .mod:hover{border-color:#3a4664;transform:translateY(-3px)}
-  .mod-hd{padding:16px 20px 14px;border-bottom:1px solid var(--line);background:var(--panel2);display:flex;align-items:baseline;gap:10px}
-  .mod-hd .num{font:700 13px/1 var(--mono);color:var(--accent);letter-spacing:.1em}
-  .mod-hd .nm{font-weight:650;font-size:16px;letter-spacing:-.01em}
-  .mod-bd{padding:18px 20px;flex:1}
-  .mod-bd .lbl{font:600 10px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px}
-  .mod-bd .finding{font-size:14.5px;color:var(--ink2);margin-bottom:18px}
-  .mod-bd .finding b{color:var(--ink)}
-  .prompt{
-    background:#0d1118;border:1px solid var(--line);border-left:3px solid var(--accent2);
-    border-radius:0 8px 8px 0;padding:13px 15px;font:13px/1.6 var(--mono);color:#b8c4dc;
-    white-space:pre-wrap;word-break:break-word;
-  }
-  .artifact{margin-top:14px;font:11px/1.5 var(--mono);color:var(--ink3);letter-spacing:.04em}
-  .artifact b{color:var(--accent);font-weight:400}
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:14px}
+  ol.steps li{counter-increment:s;position:relative;padding:18px 20px 18px 64px;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px}
+  ol.steps li::before{content:counter(s);position:absolute;left:18px;top:17px;
+    width:30px;height:30px;border-radius:9px;background:#0e121b;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font:700 14px var(--mono);color:var(--accent)}
+  ol.steps li.zero{counter-increment:none}
+  ol.steps li.zero::before{content:"0";color:var(--good);border-color:#2f6b55}
+  ol.steps li p{font-size:14.5px;margin:6px 0 0}
 
-  /* ---------- charts ---------- */
-  .chartwrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 26px 18px}
-  .chartwrap svg{display:block;width:100%;height:auto;overflow:visible}
-  .legend{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:16px;font-size:13px;color:var(--ink2)}
-  .legend span{display:flex;align-items:center;gap:8px}
-  .legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
-  .ax{font:11px var(--mono);fill:var(--ink3)}
-  .gl{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
-  .drawn{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);transition:stroke-dashoffset 1.4s cubic-bezier(.3,.8,.3,1)}
-  .in .drawn{stroke-dashoffset:0}
-  .dotfade{opacity:0;transition:opacity .5s ease .9s}
-  .in .dotfade{opacity:1}
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .6s cubic-bezier(.2,.7,.3,1),transform .6s cubic-bezier(.2,.7,.3,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
 
-  /* ---------- prototype frame ---------- */
-  .frame{
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#000;
-    box-shadow:0 24px 60px rgba(0,0,0,.5);
-  }
-  .frame-bar{
-    display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--panel2);border-bottom:1px solid var(--line);
-  }
-  .frame-bar .dots{display:flex;gap:6px}
-  .frame-bar .dots i{width:10px;height:10px;border-radius:50%;background:#333c52;display:block}
-  .frame-bar .url{
-    flex:1;font:11px var(--mono);color:var(--ink3);background:#0d1118;border:1px solid var(--line);
-    border-radius:6px;padding:5px 10px;text-align:center;
-  }
-  .frame iframe{display:block;width:100%;height:560px;border:0;background:#0b0e14}
-  .btn{
-    display:inline-flex;align-items:center;gap:9px;background:var(--accent);color:#07130f;
-    font-weight:650;font-size:14.5px;padding:11px 20px;border-radius:9px;text-decoration:none;
-    transition:transform .2s,box-shadow .2s;
-  }
-  .btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(95,211,196,.28)}
-  .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(95,211,196,.4)}
-  .btn.ghost:hover{box-shadow:0 8px 24px rgba(95,211,196,.12)}
+  svg .trace{stroke-dasharray:var(--len);stroke-dashoffset:var(--len);transition:stroke-dashoffset 1.5s ease .15s}
+  .in svg .trace{stroke-dashoffset:0}
+  svg text{font-family:var(--mono);font-size:10.5px;fill:var(--ink3)}
+  svg text.lbl{font-size:10.5px;font-weight:600}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
 
-  /* ---------- timeline ---------- */
-  .tl{position:relative;padding-left:34px;margin-top:12px}
-  .tl::before{content:"";position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,var(--line),var(--bad),var(--warn),var(--good))}
-  .tl-i{position:relative;margin-bottom:26px}
-  .tl-i::before{content:"";position:absolute;left:-30px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
-  .tl-i.r::before{border-color:var(--bad)}
-  .tl-i.y::before{border-color:var(--warn)}
-  .tl-i.g::before{border-color:var(--good)}
-  .tl-i .d{font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--ink3);margin-bottom:5px}
-  .tl-i .t{font-weight:620;font-size:16.5px;margin-bottom:4px}
-  .tl-i .s{font-size:14.5px;color:var(--ink2);max-width:58ch}
+  /* prototype frame */
+  .device{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px;overflow:hidden}
+  .device .bar{display:flex;align-items:center;gap:7px;padding:2px 4px 11px}
+  .device .bar i{width:10px;height:10px;border-radius:50%;background:#333c52;display:block}
+  .device .bar span{margin-left:8px;font:500 11.5px var(--mono);color:var(--ink3)}
+  iframe#proto{width:100%;height:600px;border:1px solid var(--line);border-radius:10px;
+    background:#fff;display:block}
+  @media(max-width:860px){iframe#proto{height:460px}}
+  #drive{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  #drive button{font:600 12.5px var(--sans);padding:9px 14px;border-radius:999px;cursor:pointer;
+    background:#0e121b;border:1px solid var(--line);color:var(--ink2);transition:all .15s}
+  #drive button:hover{border-color:var(--accent);color:var(--ink)}
+  #drive button.on{background:var(--accent);border-color:var(--accent);color:#07231f}
 
-  .kicker{
-    background:linear-gradient(135deg,rgba(95,211,196,.1),rgba(122,162,255,.06));
-    border:1px solid rgba(95,211,196,.25);border-radius:14px;padding:22px 26px;margin-top:4px;
-  }
-  .kicker p{color:var(--ink);margin:0;font-size:clamp(16px,1.5vw,19px);max-width:74ch}
+  /* simulator */
+  .sim{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .meter{height:16px;border-radius:999px;background:#0a0d14;border:1px solid var(--line);
+    overflow:hidden;position:relative;margin:8px 0 4px}
+  .meter i{display:block;height:100%;width:50%;border-radius:999px;
+    background:linear-gradient(90deg,var(--bad),var(--warn) 45%,var(--good));transition:width .45s cubic-bezier(.2,.7,.3,1)}
+  .meter b{position:absolute;left:50%;top:-4px;bottom:-4px;width:2px;background:var(--ink3);opacity:.7}
+  .simrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .simbtns{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 12px}
+  .simbtns button{font:650 13.5px var(--sans);padding:11px 18px;border-radius:10px;cursor:pointer;
+    border:1px solid var(--line);background:#0e121b;color:var(--ink);transition:all .15s}
+  .simbtns button:hover:not(:disabled){transform:translateY(-1px)}
+  #bMiss{border-color:#6b3540;color:var(--bad)} #bMiss:hover:not(:disabled){background:#1a1013}
+  #bTake{border-color:#2f6b55;color:var(--good)} #bTake:hover:not(:disabled){background:#0f1a16}
+  #bReset{color:var(--ink3)}
+  .simbtns button:disabled{opacity:.4;cursor:not-allowed}
+  #simlog{font-family:var(--mono);font-size:12.5px;color:var(--ink2);min-height:3.4em;
+    background:#0a0d14;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  #simlog.bad{border-color:#6b3540;color:var(--bad)}
+  #simlog.good{border-color:#2f6b55;color:var(--good)}
+  .offers{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;min-height:14px}
+  .offers i{width:9px;height:14px;border-radius:2px;background:var(--accent);display:block;
+    animation:pop .3s cubic-bezier(.2,.7,.3,1)}
+  @keyframes pop{from{transform:scaleY(.2);opacity:0}to{transform:none;opacity:1}}
 
-  .titlebg{
-    position:absolute;inset:0;overflow:hidden;pointer-events:none;opacity:.5;
-  }
-  .titlebg svg{position:absolute;right:-6%;top:50%;transform:translateY(-50%);width:62%;height:auto}
+  ul.ck{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+  ul.ck li{padding-left:30px;position:relative;font-size:15px;color:var(--ink2)}
+  ul.ck li::before{content:"";position:absolute;left:0;top:7px;width:14px;height:14px;
+    border-radius:4px;border:1.5px solid var(--accent)}
+  ul.ck li b{color:var(--ink)}
 
-  @media print{
-    .slide{min-height:auto;page-break-after:always;padding:40px}
-    #rail,#hint,#progress{display:none}
-    .rv{opacity:1;transform:none}
-  }
+  ul.q{list-style:none;padding:0;margin:0;display:grid;gap:11px}
+  ul.q li{font-size:14.5px;color:var(--ink2);padding-left:14px;border-left:2px solid var(--line)}
+  ul.q li b{color:var(--ink)}
+  ul.q li.blocker{border-left-color:var(--bad)}
+
+  .foot{border-top:1px solid var(--line);margin-top:26px;padding-top:16px;
+    font:500 12px var(--mono);color:var(--ink3)}
+  .kbd{font:600 11px var(--mono);border:1px solid var(--line);border-radius:5px;
+    padding:2px 6px;color:var(--ink2);background:#0e121b}
+  .hint{font:500 12.5px var(--mono);color:var(--ink3);margin-top:12px}
+  .scrollcue{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
+    font:600 10.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);
+    animation:bob 2.2s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateX(-50%) translateY(0);opacity:.55}50%{transform:translateX(-50%) translateY(6px);opacity:1}}
 </style>
 </head>
 <body>
 
 <div id="progress"></div>
-<nav id="rail"></nav>
-<div id="hint"><kbd>&darr;</kbd> <kbd>&uarr;</kbd> to move &nbsp;·&nbsp; <kbd>1</kbd>–<kbd>9</kbd> to jump</div>
+<nav id="dots"></nav>
 
 <!-- ============ 1 · TITLE ============ -->
-<section class="slide" data-nav="Title">
-  <div class="titlebg">
-    <svg viewBox="0 0 600 400" fill="none" aria-hidden="true">
-      <path d="M20 300 L80 295 L140 300 L200 290 L260 298 L320 150 L380 230 L440 240 L500 265 L560 275"
-            stroke="#5fd3c4" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>
-      <path d="M20 180 L80 185 L140 175 L200 180 L260 172 L320 190 L380 330 L440 372 L500 384 L560 390"
-            stroke="#ff6b7a" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>
-      <path d="M20 190 L80 186 L140 192 L200 184 L260 190 L320 178 L380 120 L440 70 L500 44 L560 34"
-            stroke="#7aa2ff" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>
-      <line x1="320" y1="20" x2="320" y2="390" stroke="#67738d" stroke-width="1" stroke-dasharray="4 6"/>
-      <text x="328" y="34" fill="#67738d" font-family="ui-monospace,monospace" font-size="13">4.2 · 12 AUG</text>
-    </svg>
-  </div>
-  <div class="inner">
-    <div class="eyebrow rv">Rook Dispatch · Release 4.2 · Final report</div>
-    <h1 class="rv">Four responders<br>stopped getting<br>called.</h1>
-    <p class="lede rv">The average said we were recovering. The average was hiding them.
-      This is what release 4.2 actually did, how I found it, the fix I built, and the
-      habit that catches the next one.</p>
-    <div class="grid g4 rv" style="margin-top:38px">
-      <div class="stat r"><span class="n">54%</span><span class="l">Acceptance rate the week 4.2 shipped, down from a stable 76–78%</span></div>
-      <div class="stat g"><span class="n">73%</span><span class="l">Acceptance rate three weeks later — with zero code changes shipped</span></div>
-      <div class="stat y"><span class="n">4 of 16</span><span class="l">Responders who went to near-zero callouts and are still there</span></div>
-      <div class="stat"><span class="n">0</span><span class="l">Ways the system recovers them on its own</span></div>
+<section id="s1">
+  <div class="wrap reveal">
+    <p class="eyebrow">Rook Dispatch &middot; release 4.2 &middot; October 2026</p>
+    <h1>Four responders<br>stopped getting<br>called.</h1>
+    <p class="lede">Nobody wrote the rule that did it. It fell out of three changes
+      that each looked fine on their own — and the headline metric went
+      <strong style="color:var(--good)">up</strong> while it was happening.</p>
+    <p class="lede" style="margin-top:22px">Here's what I'd do about it, and then how I know.</p>
+    <div class="grid g4" style="margin-top:34px">
+      <div class="card"><span class="stat bad">4 of 16</span><span class="cap">responders near zero</span></div>
+      <div class="card"><span class="stat good">73%</span><span class="cap">acceptance, recovering</span></div>
+      <div class="card"><span class="stat warn">0</span><span class="cap">code changes since 4.2</span></div>
+      <div class="card"><span class="stat acc">2019</span><span class="cap">age of the open TODO</span></div>
     </div>
-    <p class="dim rv" style="margin-top:34px;font-size:13.5px">
-      Onur Arslan · PM, Rook Dispatch · 1 October 2026 &nbsp;·&nbsp;
-      Six working sessions, evidence from tickets, interviews, callout data and the routing source.
-    </p>
+    <p class="foot">Onur Arslan &middot; PM, Rook Dispatch &middot; built with Claude Code</p>
   </div>
+  <div class="scrollcue">scroll</div>
 </section>
 
-<!-- ============ 2 · WHAT HAPPENED ============ -->
-<section class="slide alt" data-nav="What happened">
-  <div class="inner">
-    <div class="eyebrow rv">Plainly</div>
-    <h2 class="rv">What happened with 4.2</h2>
-    <p class="lede rv" style="margin-bottom:30px">
-      4.2 bundled three changes. Two of them were deliberate and defensible on their own.
-      Together, with a nine-year-old defect nobody had reason to look at, they built a
-      one-way door.
-    </p>
+<!-- ============ 2 · WHAT I'D DO (THE LEAD) ============ -->
+<section id="s2" class="alt">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">01</span> The recommendation</p>
+    <h2>Make standing visible.<br>Guarantee a way back.</h2>
+    <p class="lede">Engineering can fix the number this afternoon. That's worth doing and
+      it isn't the answer — it leaves the next reweight to find the same cliff with the
+      same blindfold on.</p>
 
-    <div class="grid g3 rv">
-      <div class="card">
-        <span class="pill y">Change 1 · deliberate</span>
-        <h3 style="margin-top:14px">Routing reweighted toward proximity</h3>
-        <p>Proximity <b class="accent">0.45 → 0.60</b>. Recent-acceptance <b class="accent">0.40 → 0.25</b>.
-          A long-standing, deliberate ask. Not a bug.</p>
-      </div>
-      <div class="card">
-        <span class="pill y">Change 2 · deliberate</span>
-        <h3 style="margin-top:14px">Callout timeout cut 90s → 60s</h3>
-        <p>Thirty fewer seconds to reach the phone. Committed in the Q3 roadmap as
-          "ping timeout tuning."</p>
-      </div>
-      <div class="card">
-        <span class="pill r">The part nobody shipped</span>
-        <h3 style="margin-top:14px">A missed phone scores as a refusal</h3>
-        <p>And the score <b>never recovers on its own</b>. An open <code>TODO</code> from
-          2019 that 4.2 turned from harmless into load-bearing.</p>
-      </div>
-    </div>
+    <ol class="steps" style="margin-top:28px">
+      <li class="zero"><span class="pill ship">ship today</span>
+        <h3 style="margin-top:10px">Stop scoring a missed phone as a refusal</h3>
+        <p>A timeout and a decline take the same points off. That's a defect, it's correct
+          on its own merits, and it depends on nothing below. Decoupled — it goes this
+          afternoon, not bundled into the proposal.</p></li>
 
-    <div class="kicker rv" style="margin-top:28px">
-      <p><strong>In one sentence:</strong> 4.2 didn't break routing — it narrowed the escape
-        route from a trap that was already in the code. Fewer offers, less time to answer each one,
-        and a score that only goes back up by answering one.</p>
+      <li><span class="pill next">most of the value</span>
+        <h3 style="margin-top:10px">Standing, in plain words, on the handler's card</h3>
+        <p>Not a ping count. <em>"Meteor Mite is ranked below most nearby responders.
+          Six missed offers since 10 Aug. Standing is low and isn't recovering on its own."</em>
+          Kip asked for it to "look less like a coincidence at midnight." This is that.</p></li>
+
+      <li><h3 style="margin-top:0">A guaranteed look</h3>
+        <p>Two weeks below standing with almost no offers, and Dispatch sends the next
+          suitable callout regardless of rank — at 90 seconds, not 60, because they're cold.
+          Take it, normal credit applies, you climb out. Not automatic decay: you still
+          earn it back, but we make sure you get the chance to.</p></li>
+
+      <li><h3 style="margin-top:0">Tell the responder</h3>
+        <p>Today Mite's phone says nothing, so Mite texts the handler to ask if the product
+          is broken. A quiet week you understand is a different experience from a quiet week
+          you don't.</p></li>
+    </ol>
+
+    <div class="card" style="margin-top:20px;border-color:#6b3540">
+      <span class="pill block">prerequisite</span>
+      <h3 style="margin-top:10px">Before any of it: delivery confirmation</h3>
+      <p><code class="mono">push_to_device()</code> returns nothing. Dispatch knows it
+        <em>sent</em>, never that it <em>arrived</em>. Every "11 offers reached you" is a claim
+        the system can't make — and if the two anomalies below are delivery faults, standing
+        would show them a beautifully designed lie. Marcus, first.</p>
     </div>
   </div>
 </section>
 
-<!-- ============ 3 · TIMELINE ============ -->
-<section class="slide" data-nav="Timeline">
-  <div class="inner">
-    <div class="eyebrow rv">How it unfolded</div>
-    <h2 class="rv">Seven weeks, and nobody in the room</h2>
-    <div class="grid g2" style="gap:44px;align-items:start">
-      <div class="rv">
-        <div class="tl">
-          <div class="tl-i">
-            <div class="d">12 AUG</div>
-            <div class="t">4.2 ships</div>
-            <div class="s">Three bundled changes. Callout volume that week is the highest in the
-              whole dataset — 177 offers sent.</div>
-          </div>
-          <div class="tl-i r">
-            <div class="d">13 AUG — 5 SEP</div>
-            <div class="t">Tickets go up ~3×</div>
-            <div class="s">25 tickets. 16 pure "quiet stretch," 4 pure "offer timed out," 5 compound —
-              quiet, then lost the one offer that finally arrived.</div>
-          </div>
-          <div class="tl-i y">
-            <div class="d">14 AUG</div>
-            <div class="t">Marcus asks the right question. Nobody answers.</div>
-            <div class="s">"Was that meant to apply to responders who've been turning jobs down too?"
-              Wen Li was on PTO 14–24 Aug. The thread never picks it back up.</div>
-          </div>
-          <div class="tl-i">
-            <div class="d">21 AUG</div>
-            <div class="t">Priya leaves</div>
-            <div class="s">Her read: mostly seasonal, plus the timeout change. Do not revert 4.2.
-              Regroup in September. No handover overlap.</div>
-          </div>
-          <div class="tl-i g">
-            <div class="d">31 AUG</div>
-            <div class="t">The average looks fine again</div>
-            <div class="s">73% and climbing. Case closed, if the average is all you look at.</div>
-          </div>
-          <div class="tl-i" style="margin-bottom:0">
-            <div class="d">31 AUG · SAME WEEK</div>
-            <div class="t">Farlight gets zero callouts</div>
-            <div class="s">So does Meteor Mite (1), The Undertow (1), Vesper (1). Down from 12, 11, 12 and 14.</div>
-          </div>
+<!-- ============ 3 · THE PROTOTYPE, LIVE ============ -->
+<section id="s3">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">02</span> Working prototype &mdash; click it</p>
+    <h2>This is the screen.</h2>
+    <p>Not a mockup of a mockup. The real prototype is embedded below and it's live —
+      drive it with the buttons, or click around inside it.</p>
+
+    <div id="drive">
+      <button data-v="today" class="on">Kip's console today</button>
+      <button data-v="proposed">With standing</button>
+      <button data-v="mite">Mite, week by week</button>
+      <button data-v="phone">Mite's phone</button>
+      <button data-v="recover">Walk the recovery</button>
+      <button data-v="dot">Dot's kitchen counter</button>
+      <button data-v="unknown">What we don't know</button>
+    </div>
+
+    <div class="device">
+      <div class="bar"><i></i><i></i><i></i><span>Rook Dispatch — Standing (prototype)</span></div>
+      <iframe id="proto" title="Standing prototype"></iframe>
+    </div>
+    <p class="hint">Start with <span class="kbd">Kip's console today</span> → <span class="kbd">With standing</span>.
+      Same data, same week. One of them explains itself.</p>
+  </div>
+</section>
+
+<!-- ============ 4 · WHAT HAPPENED ============ -->
+<section id="s4" class="alt">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">03</span> What happened</p>
+    <h2>Three changes shipped together on 12 August.</h2>
+    <p class="lede">Each was defensible. Nobody modelled them as a system.</p>
+    <div class="grid g3" style="margin-top:26px">
+      <div class="card">
+        <span class="cap">change one</span>
+        <h3 style="margin-top:8px">Rank by distance</h3>
+        <p><span class="mono">proximity 0.45 → <span style="color:var(--warn)">0.60</span></span><br>
+          <span class="mono">acceptance 0.40 → <span style="color:var(--warn)">0.25</span></span></p>
+        <p class="dim">A long-standing, deliberate ask. Not a bug.</p>
+      </div>
+      <div class="card">
+        <span class="cap">change two</span>
+        <h3 style="margin-top:8px">Less time to answer</h3>
+        <p><span class="mono">timeout 90s → <span style="color:var(--warn)">60s</span></span></p>
+        <p class="dim">Cut cascade latency. Also cut the window for anyone whose phone
+          isn't in their hand.</p>
+      </div>
+      <div class="card">
+        <span class="cap">change three</span>
+        <h3 style="margin-top:8px">Filter persistence</h3>
+        <p class="dim">Cosmetic. Generated noise tickets that buried the signal in the
+          support queue for two weeks.</p>
+      </div>
+    </div>
+    <p style="margin-top:26px">Within a fortnight, tickets tripled. Two thirds of them said
+      <strong>"my phone never rings"</strong> — which nothing in the release notes predicted
+      or explained.</p>
+  </div>
+</section>
+
+<!-- ============ 5 · CHART 1 ============ -->
+<section id="s5">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">04</span> Finding one</p>
+    <h2>The average lied by telling the truth.</h2>
+    <p class="lede">Acceptance rate cratered on release week, then climbed back three weeks
+      running — with <strong>zero code changes shipped</strong>. Read on its own, it says
+      "shock, recovering, stand down."</p>
+    <div class="chartbox" style="margin-top:22px" id="c1box">
+      <svg id="c1" viewBox="0 0 900 300" width="100%" role="img"
+           aria-label="Weekly acceptance rate falls from 78 percent to 54 percent on release week then recovers to 73 percent"></svg>
+    </div>
+    <div class="grid g3" style="margin-top:18px">
+      <div class="card"><span class="stat">~77%</span><span class="cap">six weeks before</span></div>
+      <div class="card"><span class="stat bad">54%</span><span class="cap">release week</span></div>
+      <div class="card"><span class="stat good">73%</span><span class="cap">three weeks later</span></div>
+    </div>
+    <p style="margin-top:20px">The recovery is real, and it's <em>caused by the problem</em>.
+      Routing self-sorts: reliable responders rise, wasted cascade hops fall, the ratio
+      improves. The metric gets healthier precisely because the work is concentrating.</p>
+  </div>
+</section>
+
+<!-- ============ 6 · CHART 2 ============ -->
+<section id="s6" class="alt">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">05</span> Finding two</p>
+    <h2>Underneath it, the work moved.</h2>
+    <p class="lede">Total volume barely dipped. It just stopped going to the same people.
+      Five responders climb every week. Four fall off a cliff.</p>
+    <div class="chartbox" style="margin-top:22px" id="c2box">
+      <svg id="c2" viewBox="0 0 900 380" width="100%" role="img"
+           aria-label="Weekly offers per responder: five responders rise steadily while four collapse toward zero after release"></svg>
+    </div>
+    <p style="margin-top:20px">This is not seasonal softening. Seasonal softening doesn't
+      create <em>winners</em>. And it isn't geography: Meteor Mite and The Gale share a
+      handler, a city and a calendar, and they moved in opposite directions.</p>
+  </div>
+</section>
+
+<!-- ============ 7 · THE TRAP, PLAYABLE ============ -->
+<section id="s7">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">06</span> Finding three &mdash; the mechanism</p>
+    <h2>Try the trap yourself.</h2>
+    <p class="lede">You start at neutral standing, 0.50, with roughly 12 offers a week.
+      Miss one and you lose 0.12. Accept one and you gain 0.08. See how far you get.</p>
+
+    <div class="grid g2" style="margin-top:24px;align-items:start">
+      <div class="sim">
+        <div class="simrow">
+          <span class="cap">your standing</span>
+          <span class="mono" id="sScore" style="font-size:20px;font-weight:700;color:var(--good)">0.50</span>
         </div>
+        <div class="meter"><b></b><i id="sBar"></i></div>
+        <div class="simrow" style="margin-top:14px">
+          <span class="cap">offers you'll get next week</span>
+          <span class="mono" id="sOffers" style="font-size:20px;font-weight:700">12</span>
+        </div>
+        <div class="offers" id="sPips"></div>
+
+        <div class="simbtns">
+          <button id="bMiss">Miss one</button>
+          <button id="bTake">Accept one</button>
+          <button id="bReset">Reset</button>
+        </div>
+        <div id="simlog">Neutral standing. Phone rings about twice a day.</div>
       </div>
-      <div class="rv">
-        <div class="card" style="margin-bottom:18px">
-          <span class="pill r">The inherited read</span>
-          <h3 style="margin-top:14px">"It's mostly seasonal. August is always soft."</h3>
-          <p style="margin-top:8px">Total weekly volume was flat-to-peak <b>right through release week</b>
-            and only dropped the week after. And a seasonal dip doesn't create winners —
-            this was redistribution, not softening.</p>
-          <p style="margin-top:10px" class="dim">The file covers one season, so it can't confirm or refute
-            "August is always soft" as a general claim either. It can rule it out as <i>this</i> driver.</p>
+
+      <div style="display:grid;gap:14px">
+        <div>
+          <p class="cap" style="margin-bottom:7px">the two lines that build the trap</p>
+          <pre class="code"><span class="c"># history.py</span>
+<span class="c"># TODO(wen, 2019): should this ease back toward</span>
+<span class="c"># NEUTRAL_SCORE on its own after a while?</span>
+<span class="c"># Leaving it as-is for now.</span>
+<span class="k">def</span> record_declined(responder):
+    <span class="s">"""They turned it down, <span class="hi">or we ran out of</span>
+    <span class="hi">time waiting</span>. Same either way."""</span>
+    _set(responder,
+         recent_acceptance(responder) <span class="hi">- DECLINE_PENALTY</span>)</pre>
         </div>
         <div class="card">
-          <span class="pill a">What was actually true</span>
-          <h3 style="margin-top:14px">Two different complaints, one story</h3>
-          <p style="margin-top:8px">"Offer gone before I could answer" was expected and explained — the timeout cut.
-            "Phone never rings" was the unexplained two-thirds. They are the same mechanism, one step apart:
-            miss the 60-second window, lose score, stop getting offers.</p>
+          <h3>One way down, one way up</h3>
+          <p>Points come off for a decline <em>and</em> for a phone you didn't reach in
+            60 seconds. Points only go on by accepting an offer — and the trap is that
+            fewer offers arrive.</p>
+          <p><strong>The score never decays back to neutral.</strong> Wen flagged it in
+            2019 and left it, for a good reason: someone who really stopped working
+            shouldn't quietly re-rank. 4.2 turned that reasonable choice into a one-way door.</p>
         </div>
       </div>
     </div>
+    <p class="hint">Keep clicking "Miss one". The button that fixes it disables itself.</p>
   </div>
 </section>
 
-<!-- ============ 4 · THE AVERAGE ============ -->
-<section class="slide alt" data-nav="The average">
-  <div class="inner">
-    <div class="eyebrow rv">Evidence · <span class="dim">00-rook/data/callout-history.csv</span></div>
-    <h2 class="rv">The headline metric recovered on its own</h2>
-    <p class="lede rv" style="margin-bottom:26px">Acceptance rate is Dispatch's headline number, reported weekly
-      in aggregate. It crashed the week 4.2 shipped and climbed back for three straight weeks —
-      with <b>no code shipped after 4.2</b>. I checked the changelog.</p>
-
-    <div class="chartwrap rv" id="c1wrap">
-      <svg viewBox="0 0 980 340" role="img" aria-label="Weekly aggregate acceptance rate, 29 June to 31 August 2026">
-        <g id="c1"></g>
-      </svg>
-      <div class="legend">
-        <span><i style="background:#5fd3c4"></i> Weekly aggregate acceptance rate (offers taken ÷ offers sent, all 16 responders)</span>
-        <span><i style="background:#ff6b7a"></i> 4.2 ships, 12 Aug</span>
-      </div>
-    </div>
-
-    <div class="grid g3 rv" style="margin-top:22px">
-      <div class="card">
-        <h3>Why it recovered</h3>
-        <p>Self-sorting. The reweight pulls fast, reliable responders to the top, so fewer
-          offers get wasted on cascade hops. The average improves <i>because</i> the same
-          few people take everything.</p>
-      </div>
-      <div class="card">
-        <h3>And behaviour adapted</h3>
-        <p>Aunt Dot now tells Vesper's partner to keep the phone in his pocket rather than
-          upstairs, to beat the 60-second window. People fixed it themselves, uncredited.</p>
-      </div>
-      <div class="card" style="border-color:rgba(255,180,84,.4)">
-        <h3 class="warn">The trap in the number</h3>
-        <p>Recovery here is <b>evidence of the problem</b>, not evidence against it.
-          A metric that improves when concentration gets worse will never show you concentration.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 5 · REDISTRIBUTION ============ -->
-<section class="slide" data-nav="Redistribution">
-  <div class="inner">
-    <div class="eyebrow rv">Evidence · the same CSV, split by person</div>
-    <h2 class="rv">Underneath it, the work moved</h2>
-    <p class="lede rv" style="margin-bottom:26px">Same ten weeks. Same file. Offers sent per responder per week.
-      Five responders rise every single week after 4.2. Four collapse toward zero and keep going.
-      Nothing in the aggregate shows this.</p>
-
-    <div class="chartwrap rv" id="c2wrap">
-      <svg viewBox="0 0 980 380" role="img" aria-label="Offers sent per responder per week, winners rising and losers collapsing after 4.2">
-        <g id="c2"></g>
-      </svg>
-      <div class="legend">
-        <span><i style="background:#7ee08f"></i> Rising: The Gale, Nightwell, Stormwrack, Captain Vantage, Sgt. Falkirk</span>
-        <span><i style="background:#ff6b7a"></i> Collapsing: Farlight, Meteor Mite, The Undertow, Vesper</span>
-        <span><i style="background:#67738d"></i> Everyone else</span>
-      </div>
-    </div>
-
-    <div class="grid g2 rv" style="margin-top:22px">
-      <div class="card">
-        <h3 class="bad">Still getting worse, week over week</h3>
-        <p>This is the part that didn't recover. Farlight went 12 → 10 → 3 → 1 → 0.
-          The Gale went 13 → 15 → 17 → 20 → 21. Both of these are the same release working as designed.</p>
-      </div>
-      <div class="card">
-        <h3>It isn't geography</h3>
-        <p>The four moved in a synchronised, monotonic pattern — not the noisy up-and-down you'd get
-          from geographic luck. And Meteor Mite and The Gale have the <b>same handler, same city, same weeks</b>,
-          moving in opposite directions.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 6 · MECHANISM ============ -->
-<section class="slide alt" data-nav="Mechanism">
-  <div class="inner">
-    <div class="eyebrow rv">Root cause · confirmed in <span class="dim">00-rook/code/dispatch-routing/</span></div>
-    <h2 class="rv">The one-way door, in nine lines of code</h2>
-
-    <div class="grid g2" style="gap:26px;align-items:start;margin-top:8px">
-      <div class="rv">
-        <div class="fname">config.py</div>
-        <pre class="code"><span class="c"># How long a callout offer stays on a responder's
-# phone before we give up and move to the next person.</span>
-OFFER_TIMEOUT_SECONDS = <span class="s">60</span>      <span class="c"># was 90 until 4.2</span>
-
-WEIGHT_PROXIMITY         = <span class="s">0.60</span>  <span class="c"># was 0.45 until 4.2</span>
-WEIGHT_RECENT_ACCEPTANCE = <span class="s">0.25</span>  <span class="c"># was 0.40 until 4.2</span>
-WEIGHT_CAPABILITY_MATCH  = <span class="s">0.15</span>  <span class="c"># unchanged since 4.0</span>
-
-ACCEPTANCE_CREDIT = <span class="s">0.08</span>
-DECLINE_PENALTY   = <span class="s">0.12</span></pre>
-        <p style="margin-top:14px;font-size:14.5px">The penalty is <b>1.5× the credit</b>. You need three
-          accepted callouts to undo two missed ones — and there is no reset or migration logic anywhere.
-          Everyone's existing score carried straight across the release boundary.</p>
-      </div>
-
-      <div class="rv">
-        <div class="fname">history.py</div>
-        <pre class="code"><span class="c"># TODO(wen, 2019): should this ease back toward
-# NEUTRAL_SCORE on its own after a while? For: somebody
-# who had a bad month shouldn't still be carrying it in
-# the spring. Against: if somebody has stopped taking
-# work, we probably want that to stick until they take
-# work again. Leaving it as-is for now.</span>
-<span class="k">def</span> record_declined(responder):
-    <span class="hl">"""They turned it down, <span class="bad">or we ran out of time</span></span>
-<span class="hl">    waiting. <span class="bad">Same either way</span> — we asked and we</span>
-<span class="hl">    didn't get a yes."""</span>
-    _set(responder, recent_acceptance(responder) - DECLINE_PENALTY)</pre>
-        <p style="margin-top:14px;font-size:14.5px">A phone in another room is recorded identically to
-          a refusal. And the only function that puts points back on is <code>record_accepted()</code> —
-          which requires landing an offer inside a 60-second window you're no longer being sent.</p>
-      </div>
-    </div>
-
-    <div class="kicker rv" style="margin-top:26px">
-      <p><strong>The loop:</strong> miss an offer → score drops → rank drops → fewer offers →
-        fewer chances to earn it back → the rare offer that does arrive is more likely to time out →
-        score drops further. <span class="bad">Nothing in the system reverses this.</span>
-        The only exits are a very close incident, every higher-ranked responder declining first,
-        a handler's manual override, or an engineering change.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 7 · KIP ============ -->
-<section class="slide" data-nav="Who it happens to">
-  <div class="inner">
-    <div class="eyebrow rv">Who this happens to</div>
-    <h2 class="rv">Two cards on one handler's screen</h2>
-    <p class="lede rv">Kip handles both Meteor Mite and The Gale. Same city, same weeks,
-      two cards side by side on his centre monitor.</p>
-
-    <div class="grid g2" style="gap:30px;align-items:start;margin-top:22px">
-      <div class="rv">
+<!-- ============ 8 · WHO ============ -->
+<section id="s8" class="alt">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">07</span> Who it happens to</p>
+    <h2>Two cards on one screen.</h2>
+    <p class="lede">Kip handles both. Same city, same weeks, side by side on his centre monitor.</p>
+    <div class="grid g2" style="margin-top:24px;align-items:start">
+      <div class="card" style="padding:12px 16px">
         <table>
-          <thead>
-            <tr><th>Week</th><th>Meteor Mite</th><th>The Gale</th></tr>
-          </thead>
+          <thead><tr><th>Week</th><th style="text-align:right">Meteor Mite</th><th style="text-align:right">The Gale</th></tr></thead>
           <tbody>
-            <tr><td class="num">3 Aug</td><td class="num">11 offers · 8 taken</td><td class="num">13 offers · 10 taken</td></tr>
-            <tr class="mark"><td class="num">10 Aug <span class="dim">· 4.2 ships 12th</span></td><td class="num warn">10 offers · <b>4 taken</b></td><td class="num">15 offers · 9 taken</td></tr>
-            <tr><td class="num">17 Aug</td><td class="num bad">4 offers · 1 taken</td><td class="num good">17 offers · 12 taken</td></tr>
-            <tr><td class="num">24 Aug</td><td class="num bad">2 offers · 0 taken</td><td class="num good">20 offers · 14 taken</td></tr>
-            <tr><td class="num">31 Aug</td><td class="num bad">1 offer · 0 taken</td><td class="num good">21 offers · 16 taken</td></tr>
+            <tr><td>3 Aug</td><td class="num">11 → 8</td><td class="num">13 → 10</td></tr>
+            <tr class="flip"><td>10 Aug <span class="dim">(4.2 ships 12th)</span></td><td class="num">10 → 4</td><td class="num">15 → 9</td></tr>
+            <tr><td>17 Aug</td><td class="num" style="color:var(--bad)">4 → 1</td><td class="num" style="color:var(--good)">17 → 12</td></tr>
+            <tr><td>24 Aug</td><td class="num" style="color:var(--bad)">2 → 0</td><td class="num" style="color:var(--good)">20 → 14</td></tr>
+            <tr><td>31 Aug</td><td class="num" style="color:var(--bad)">1 → 0</td><td class="num" style="color:var(--good)">21 → 16</td></tr>
           </tbody>
         </table>
-        <div class="card" style="margin-top:18px;border-color:rgba(255,180,84,.4)">
-          <h3 class="warn">The catchable week was 10 Aug, not 17 Aug</h3>
-          <p>Mite's <i>acceptance</i> collapsed a full week before the offer volume did — 10 offers,
-            4 taken, while the volume still looked completely normal. Nothing on the console changes
-            when only acceptance moves. The early warning exists in the data and on no screen.</p>
-        </div>
+        <p class="dim" style="font-size:12.5px;margin-top:10px">offers sent → offers taken</p>
       </div>
+      <div style="display:grid;gap:14px">
+        <blockquote>Two cards on the same screen that might as well be two different
+          products… I don't have anything better than "hang in there, it'll pick up."
+          <cite>Kip, handler — Meteor Mite &amp; The Gale</cite></blockquote>
+        <div class="card" style="border-color:#5a4520">
+          <h3 style="color:var(--warn)">The catchable week was 10 Aug</h3>
+          <p>Mite's <em>acceptance</em> collapsed first — 10 offers, 4 taken — while volume
+            still looked normal. The volume crash came a week later. Nothing on the console
+            changes when only acceptance moves. The early warning existed in the data and
+            on no screen.</p>
+        </div>
+        <blockquote style="border-left-color:var(--accent)">Maybe something that tells me too,
+          not just him. <strong>I don't need to do anything about it. I'd just like to know.</strong>
+          <cite>Aunt Dot, handler — Vesper. Asked for this, unprompted, three weeks before I did.</cite></blockquote>
+      </div>
+    </div>
+    <p style="margin-top:22px"><strong>Meteor Mite has no pronoun in any source</strong> — cover
+      identities aren't stored or derivable, and Kip only ever says the name. Earlier drafts of
+      mine invented one. Use the name.</p>
+  </div>
+</section>
 
-      <div class="rv">
-        <div class="quote">two cards on the same screen that might as well be two different products… I don't have anything better than "hang in there, it'll pick up."
-          <cite>Kip, handler — Meteor Mite and The Gale</cite></div>
-        <div class="quote" style="border-left-color:var(--accent)">maybe something that tells me too, not just him. <b>I don't need to do anything about it. I'd just like to know.</b>
-          <cite>Aunt Dot, handler — Vesper. Unprompted, three weeks before anyone asked.</cite></div>
-        <p>Meteor Mite is texting Kip asking if something is broken. Nothing is broken.
-          Mite is being told, silently and correctly, that Mite is ranked low — and the path back
-          is accepting an offer that isn't coming.</p>
-        <p><b>Neither of them can see the score.</b> Neither can Nadia's support team.
-          Aunt Dot never filed a ticket at all — Vesper went from 14 callouts a week to 1 and she just adapted.
-          The ticket pile would never have found her.</p>
+<!-- ============ 9 · PROMPTS 1-3 ============ -->
+<section id="s9">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">08</span> How I found it</p>
+    <h2>Six questions, in order.</h2>
+    <p class="lede">Verbatim. The useful ones were short, specific, and willing to be wrong.</p>
+
+    <div class="grid" style="margin-top:24px;gap:16px">
+      <div class="prompt">
+        <div class="ph"><b>01</b> · don't accept the framing</div>
+        <div class="pb">is fixing the issues from the 4.2 release the most prominent thing I should focus on as a PM?</div>
+        <div class="po"><b>Answer: no.</b> It reframed the first month as four parallel tracks —
+          a <em>bounded</em> 4.2 investigation, relationships, the missing routing spec, and Q4.
+          Everything downstream stayed scoped because of this.</div>
+      </div>
+      <div class="prompt">
+        <div class="ph"><b>02</b> · look for the disagreement</div>
+        <div class="pb">You've now read both folders. Where do they disagree? What's loud in the interviews but rare in the tickets, and what's all over the tickets that nobody brought up in the interviews?</div>
+        <div class="po"><b>Answer: they're disjoint populations.</b> One name overlaps across 25
+          tickets and 4 interviews. Tickets skew angry; the interviews were UX research and
+          <em>undersold</em> the severity for the worst-affected. Neither source could have
+          found this alone.</div>
+      </div>
+      <div class="prompt">
+        <div class="ph"><b>03</b> · state the hypothesis, invite the correction</div>
+        <div class="pb">what causes this redistribution? is there a respondent score that causes loser cluster is not getting pings again because their scores have dropped and they not getting pings causes the score don't raise again and making this losing effect persistent?</div>
+        <div class="po"><b>Answer: yes — and it was confirmable in code, not inferred.</b>
+          Naming the suspected loop made it checkable. The same pass also killed the
+          "mostly seasonal" read: volume peaked <em>during</em> release week.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ 8 · MODULE TRAIL A ============ -->
-<section class="slide alt" data-nav="How I found it · 1–3">
-  <div class="inner">
-    <div class="eyebrow rv">How I got here · the prompts that produced it</div>
-    <h2 class="rv">Six sessions, six turning points</h2>
-    <p class="lede rv" style="margin-bottom:28px">One real finding per module, and the exact prompt I typed to get it —
-      verbatim, typos and all.</p>
+<!-- ============ 10 · PROMPTS 4-6 ============ -->
+<section id="s10" class="alt">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">09</span> How I found it &mdash; continued</p>
+    <h2>Then: prove it, build it, keep it from recurring.</h2>
 
-    <div class="grid g3 rv">
-      <article class="mod">
-        <div class="mod-hd"><span class="num">01</span><span class="nm">Origin Story</span></div>
-        <div class="mod-bd">
-          <div class="lbl">Finding</div>
-          <div class="finding">The investigation shouldn't be the whole job. I decided to run the
-            4.2 work <b>in parallel</b> with relationship-building, closing the missing routing-logic
-            doc, and shaping Q4 — rather than spending my first month as an incident responder.
-            That framing is now in CLAUDE.md so it doesn't get re-litigated every session.</div>
-          <div class="lbl">Exact prompt</div>
-          <div class="prompt">is fixing the issues from the 4.2 release the most prominent thing I should focus on as a PM?</div>
-          <div class="artifact">Artifact · <b>CLAUDE.md</b> — persistent working context</div>
-        </div>
-      </article>
-
-      <article class="mod">
-        <div class="mod-hd"><span class="num">02</span><span class="nm">Super Hearing</span></div>
-        <div class="mod-bd">
-          <div class="lbl">Finding</div>
-          <div class="finding">Tickets and interviews are <b>almost entirely disjoint populations</b> —
-            only one person appears in both. Tickets skew to whoever is angry enough to complain;
-            the UX interviews undersold the severity even for directly-affected responders.
-            Both piles were telling the truth. Neither was representative.</div>
-          <div class="lbl">Exact prompt</div>
-          <div class="prompt">You've now read both folders. Where do they disagree? What's loud in the interviews but rare in the tickets, and what's all over the tickets that nobody brought up in the interviews?</div>
-          <div class="artifact">Artifact · ticket themes: 16 quiet · 4 timeout · 5 compound</div>
-        </div>
-      </article>
-
-      <article class="mod">
-        <div class="mod-hd"><span class="num">03</span><span class="nm">Rewind</span></div>
-        <div class="mod-bd">
-          <div class="lbl">Finding</div>
-          <div class="finding">The feedback-loop hypothesis, confirmed against real weekly data:
-            this did <b>not</b> happen to everyone. A winner cluster rises every week while a loser
-            cluster collapses to zero. That reframed the whole thing from "acceptance is down"
-            to "the work has been redistributed, permanently."</div>
-          <div class="lbl">Exact prompt</div>
-          <div class="prompt">what causes this redistribution? is there a respondent score that causes loser cluster is not getting pings again because their scores have dropped and they not getting pings causes the score don't raise again and making this losing effect persistent?</div>
-          <div class="artifact">Artifact · the redistribution chart on the previous slide</div>
-        </div>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 9 · MODULE TRAIL B ============ -->
-<section class="slide" data-nav="How I found it · 4–6">
-  <div class="inner">
-    <div class="eyebrow rv">How I got here · continued</div>
-    <h2 class="rv">From hypothesis to source code to a shippable fix</h2>
-
-    <div class="grid g3 rv" style="margin-top:22px">
-      <article class="mod">
-        <div class="mod-hd"><span class="num">04</span><span class="nm">X-Ray Vision</span></div>
-        <div class="mod-bd">
-          <div class="lbl">Finding</div>
-          <div class="finding">Asked for every line that takes points off and every line that puts
-            them back on. Points come off in one place — <code>record_declined()</code>, which fires on
-            <code>NO_ANSWER</code> too. Points go on in exactly one place, <code>record_accepted()</code>.
-            <b>There is no third option.</b> That asymmetry is the root cause, confirmed rather than inferred.</div>
-          <div class="lbl">Exact prompt</div>
-          <div class="prompt">Find me the part of this code that takes points off somebody when they miss a ping or turn one down. Show it to me and explain it in plain English. Then find me every single thing in this code that puts points back on.</div>
-          <div class="artifact">Artifact · <b>history.py</b> / <b>config.py</b> walkthrough, slide 6</div>
-        </div>
-      </article>
-
-      <article class="mod">
-        <div class="mod-hd"><span class="num">05</span><span class="nm">Super Speed</span></div>
-        <div class="mod-bd">
-          <div class="lbl">Finding</div>
-          <div class="finding">Helen didn't want a constant quietly flipped — she wanted it from the
-            point of view of the person it happens to. Turned that into a one-pager plus a
-            <b>clickable prototype</b>, built in one sitting. Building it surfaced three things no
-            document would have: the delivery-confirmation blocker, the fact that capping the busiest
-            responder helps the quietest one by exactly zero, and that "the next callout Mite can do"
-            isn't expressible in the data model.</div>
-          <div class="lbl">Exact prompt</div>
-          <div class="prompt">Take the brief you just wrote and build me a working prototype, an actual screen I can click through, not a description of one. Save it as 05-super-speed/prototype.html, a single file I can just open in my browser. Show me where this would actually happen, and make at least one thing on it respond when I click it.</div>
-          <div class="artifact">Artifact · <b>05-super-speed/brief.md</b> + <b>prototype.html</b></div>
-        </div>
-      </article>
-
-      <article class="mod">
-        <div class="mod-hd"><span class="num">06</span><span class="nm">Sidekicks</span></div>
-        <div class="mod-bd">
-          <div class="lbl">Finding</div>
-          <div class="finding">Turned my own review habit into a reusable check and scheduled it weekly.
-            Its first run found a <b>pattern, not a one-off</b>: 3 of 5 briefs in this repo had no real
-            success measure stated up front — <b>including my own Standing brief</b>, which buries the
-            metric question inside "Open questions." The check caught its author.</div>
-          <div class="lbl">Exact prompt</div>
-          <div class="prompt">I want to save a habit as something I can reuse. When I review a brief before it goes any further, here's what I actually check for:
-- It names who owns it
-- It says how we'll know it worked
-- The scope at the end matches the scope at the start
-- It explains the problem before it proposes a fix
-
-Turn that into a skill called review-checklist, so I can point it at any brief and get the same check every time, without me explaining it again.</div>
-          <div class="artifact">Artifact · <b>06-sidekicks/review-checklist.md</b> + weekly schedule</div>
-        </div>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 10 · THE FIX ============ -->
-<section class="slide alt" data-nav="The fix">
-  <div class="inner">
-    <div class="eyebrow rv">The fix · <span class="dim">05-super-speed/</span></div>
-    <h2 class="rv">Standing — what we'd build instead of changing a constant</h2>
-
-    <div class="grid g2" style="gap:34px;align-items:start;margin-top:10px">
-      <div class="rv">
-        <div class="card" style="border-color:rgba(126,224,143,.4);margin-bottom:18px">
-          <span class="pill g">Ship today · decoupled</span>
-          <h3 style="margin-top:14px">Stop scoring a missed phone as a refusal</h3>
-          <p>It's a real defect, it's correct on its own merits, and it depends on nothing below.
-            My first draft held it hostage to the bigger proposal — that was me protecting
-            the proposal over the product. <b>Let it go this afternoon.</b></p>
-        </div>
-
-        <div class="card" style="margin-bottom:14px">
-          <span class="pill a">Piece 1 · ships first, carries most of the value</span>
-          <h3 style="margin-top:12px">Standing, in plain words, with the reason</h3>
-          <p>The coverage card stops being a ping count and becomes an explanation:
-            <i>"Meteor Mite is being ranked below most nearby responders. Six missed offers since 10 Aug.
-            Standing is low and isn't recovering on its own."</i></p>
-        </div>
-        <div class="card" style="margin-bottom:14px">
-          <span class="pill">Piece 2</span>
-          <h3 style="margin-top:12px">A guaranteed look</h3>
-          <p>Two weeks under threshold and Dispatch sends the next suitable callout regardless of rank —
-            at 90 seconds, not 60, because they're cold. Not automatic decay, not permanence.
-            You still earn it back; we make sure you get the chance to.</p>
-        </div>
-        <div class="card">
-          <span class="pill">Piece 3</span>
-          <h3 style="margin-top:12px">Tell the responder on their phone</h3>
-          <p>A quiet week you understand is a completely different experience from a quiet week you don't.</p>
-        </div>
-
-        <p style="margin-top:20px"><b>Why this and not a decay constant:</b> a constant fixes Mite's number
-          and teaches us nothing. The next time routing re-ranks someone into silence — mutual aid in Q4
-          will do exactly this — we'd be back here with no visibility and no recovery path.
-          Standing survives the next reweight.</p>
-
-        <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap">
-          <a class="btn" href="05-super-speed/prototype.html" target="_blank" rel="noopener">Open the prototype &rarr;</a>
-          <a class="btn ghost" href="05-super-speed/brief.md" target="_blank" rel="noopener">Read the one-pager</a>
-        </div>
+    <div class="grid" style="margin-top:24px;gap:16px">
+      <div class="prompt">
+        <div class="ph"><b>04</b> · ask for the asymmetry, not the explanation</div>
+        <div class="pb">Find me the part of this code that takes points off somebody when they miss a ping or turn one down. Show it to me and explain it in plain English. Then find me every single thing in this code that puts points back on.</div>
+        <div class="po"><b>Answer: two ways down, one way up, no decay.</b> Asking for the
+          <em>complete list</em> of the opposite force is what exposed the one-way door.
+          "Explain the scoring" would have produced a summary and nothing actionable.</div>
       </div>
-
-      <div class="rv">
-        <div class="frame">
-          <div class="frame-bar">
-            <div class="dots"><i></i><i></i><i></i></div>
-            <div class="url">05-super-speed/prototype.html — clickable, offline, single file</div>
-          </div>
-          <iframe src="05-super-speed/prototype.html" title="Standing prototype — handler console and responder phone" loading="lazy"></iframe>
-        </div>
-        <p class="dim" style="margin-top:12px;font-size:13px">Live prototype, embedded. If your browser blocks
-          local iframes, use the button to open it directly.</p>
+      <div class="prompt">
+        <div class="ph"><b>05</b> · refuse the description</div>
+        <div class="pb">Take the brief you just wrote and build me a working prototype, an actual screen I can click through, not a description of one. Save it as 05-super-speed/prototype.html, a single file I can just open in my browser. Show me where this would actually happen, and make at least one thing on it respond when I click it.</div>
+        <div class="po"><b>Answer: the screen two slides up.</b> Building it surfaced three
+          things the brief alone never would have — the delivery-confirmation blocker, that
+          capping the busiest responder reaches the quietest one by <em>exactly zero</em>
+          extra offers, and that "the next callout Mite can do" isn't a concept routing has.</div>
+      </div>
+      <div class="prompt">
+        <div class="ph"><b>06</b> · turn the habit into a thing that runs</div>
+        <div class="pb">Turn my review habit into a reusable skill: owner named, success measure stated, scope at the end matches scope at the start, problem explained before the fix. Save it in this directory and schedule it weekly.</div>
+        <div class="po"><b>Answer: it failed my own brief first.</b> See the next slide.</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ 11 · HONEST LIST ============ -->
-<section class="slide" data-nav="What's not solved">
-  <div class="inner">
-    <div class="eyebrow rv">The honest list</div>
-    <h2 class="rv">What building it surfaced that writing it never would</h2>
-    <p class="lede rv" style="margin-bottom:26px">These are not caveats. Three of them are reasons the proposal
-      isn't ready, and one of them is a prerequisite that outranks the whole thing.</p>
+<!-- ============ 11 · THE HABIT ============ -->
+<section id="s11">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">10</span> So it doesn't happen again</p>
+    <h2>Four questions, every brief, every Monday.</h2>
+    <p class="lede">4.2 wasn't a coding failure. Three reasonable changes shipped with no
+      stated success measure that would have caught the fourth thing they did together.
+      So I made the check automatic.</p>
 
-    <div class="grid g2 rv">
-      <div class="card" style="border-color:rgba(255,107,122,.4)">
-        <span class="pill r">Blocker · Marcus, before anything</span>
-        <h3 style="margin-top:12px">We can't prove an offer was ever delivered</h3>
-        <p><code>push_to_device()</code> returns nothing. Dispatch knows only that it <i>sent</i>.
-          Every "N offers reached you" in my prototype is a claim the system cannot make —
-          and if Nightwell and Ironvale are delivery faults, standing shows them a
-          <b>well-designed lie</b>.</p>
-      </div>
-      <div class="card" style="border-color:rgba(255,180,84,.4)">
-        <span class="pill y">Counter-intuitive · have this ready</span>
-        <h3 style="margin-top:12px">Capping the busiest responder helps the quietest by zero</h3>
-        <p>Throttle The Gale and the overflow cascades to the next-ranked high-standing responders —
-          Falkirk, Stormwrack, Vantage, Nightwell. Meteor Mite, 14th of 16, gets <b>+0</b>.
-          It's the first fix anyone proposes and it silently fails.</p>
-      </div>
+    <div class="grid g2" style="margin-top:24px;align-items:start">
       <div class="card">
-        <span class="pill y">Unpriced</span>
-        <h3 style="margin-top:12px">A guaranteed look is taken from the incident</h3>
-        <p>Mite at 34 minutes instead of someone at 6, plus 90 seconds before the cascade.
-          That's a safety trade and I costed it at zero. It also lowers acceptance rate
-          <i>on purpose</i> — Ravi's headline weekly number. Needs a segmented metric or an explicit agreement.</p>
-      </div>
-      <div class="card">
-        <span class="pill y">Scale &amp; scope</span>
-        <h3 style="margin-top:12px">My own threshold flags 4 of 16 at once</h3>
-        <p>That's a second routing policy, not a safety valve, and contention between competing
-          guaranteed looks is undefined. The 90s also partially reverses a committed 4.2 decision —
-          Helen's call, not an implementation detail.</p>
-      </div>
-      <div class="card">
-        <span class="pill">Undefined</span>
-        <h3 style="margin-top:12px">"The next callout Mite can do" isn't expressible</h3>
-        <p><code>capability_score</code> is partial credit, <code>rank_for_callout</code> never filters
-          ("Nobody is removed here"), and callouts carry no severity field.
-          This is a data-model change, not a config change.</p>
-      </div>
-      <div class="card">
-        <span class="pill">Open questions · still unanswered</span>
-        <h3 style="margin-top:12px">Two data-integrity anomalies, and Wen Li</h3>
-        <p>Nightwell and Ironvale both filed "no callouts" tickets during the exact weeks the backend
-          shows them at record volume — likely notification delivery, not routing. And Marcus's
-          14 Aug question to Wen Li has never been answered. Messages drafted, not yet sent.</p>
-      </div>
-    </div>
-
-    <p class="dim rv" style="margin-top:22px;font-size:14px">
-      <b>Meteor Mite has no pronoun in any source.</b> Kip says "Mite thinks Mite's been forgotten" —
-      the name twice, never "he" or "she." Cover identity is never stored or derivable.
-      Earlier drafts of mine invented one; corrected in both deliverables.
-    </p>
-  </div>
-</section>
-
-<!-- ============ 12 · THE HABIT ============ -->
-<section class="slide alt" data-nav="The habit">
-  <div class="inner">
-    <div class="eyebrow rv">So it doesn't happen again</div>
-    <h2 class="rv">The habit that catches the next one</h2>
-    <p class="lede rv">4.2 wasn't a bad decision. It was three reasonable decisions shipped together,
-      with nobody holding the question "who does this make worse?" The fix for that isn't vigilance.
-      It's a check that runs whether or not I remember to run it.</p>
-
-    <div class="grid g2" style="gap:30px;align-items:start;margin-top:26px">
-      <div class="rv">
-        <div class="fname">06-sidekicks/review-checklist.md · runs every Monday morning</div>
-        <div class="card" style="padding:26px">
-          <ul class="clean" style="margin-bottom:0">
-            <li><b>Owner named</b> — not "the team," a person.</li>
-            <li><b>Success defined</b> — a metric, a signal, a threshold. Not a description of the fix.</li>
-            <li><b>Scope holds</b> — the scope at the end matches the scope at the start.</li>
-            <li><b>Problem before fix</b> — flag any brief that opens with the solution and backfills the problem.</li>
-          </ul>
-        </div>
-        <p style="margin-top:18px">Point it at any brief and get the same four questions, every time,
-          without re-explaining them. Scheduled <code>review-checklist-weekly</code>, Monday mornings,
-          against whatever briefs are in the directory. Nothing has to be ready for it to fire —
-          the point is the habit, not the result.</p>
-      </div>
-
-      <div class="rv">
-        <div class="fname">First run · five briefs · what it found</div>
-        <div class="card" style="border-color:rgba(255,180,84,.4);margin-bottom:16px">
-          <span class="pill r">3 of 5 failed the same check</span>
-          <h3 style="margin-top:12px">No real success measure stated up front</h3>
-          <p>Bulk Callout and Handler Phone App had something directional but no baseline.
-            Routing Override Audit Log had none at all. <b>And my own Standing brief</b> buries
-            the metric question inside "Open questions" rather than stating it.</p>
-        </div>
-        <ul class="clean">
-          <li class="x"><b>Handler Phone App</b> states the fix before the problem — Proposal section sits above "What this solves."</li>
-          <li class="x"><b>Requisition Approval Chains</b> scope-creeps inside its own proposal: "that's the whole ask," immediately followed by four more asks.</li>
-          <li class="q"><b>The useful part:</b> this is a pattern across the team's briefs, not a one-off. A one-off you fix. A pattern you build a check for.</li>
+        <span class="cap">the checklist</span>
+        <ul class="ck" style="margin-top:14px">
+          <li><b>Owner named.</b> Not "the team." A person.</li>
+          <li><b>Success defined.</b> A metric, a signal, a threshold — not a description of the fix.</li>
+          <li><b>Scope holds.</b> Does the scope at the end match the scope at the start?</li>
+          <li><b>Problem before fix.</b> Flag any brief that opens with the solution and backfills.</li>
         </ul>
-        <div class="kicker" style="margin-top:20px">
-          <p>The check caught its author. That's the only real evidence it works —
-            I'm rereading the Standing brief with this lens before it goes to Helen.</p>
+        <p class="dim" style="margin-top:16px;font-size:13px">Runs weekly against every brief
+          in the directory. Returns pass/fail with a one-line reason — not a rewrite.</p>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div class="card" style="border-color:#5a4520">
+          <span class="cap" style="color:var(--warn)">first run · five briefs</span>
+          <h3 style="margin-top:9px">It found a pattern, not a typo</h3>
+          <p><strong>3 of 5 had no real success measure.</strong> Two were directional with no
+            baseline. One had none at all.</p>
+          <p>One stated the fix before the problem. One scope-crept inside its own proposal —
+            "that's the whole ask," immediately followed by four more asks.</p>
+        </div>
+        <div class="card" style="border-color:#2f6b55">
+          <h3 style="color:var(--good)">Including mine</h3>
+          <p>My Standing brief buries its success measure inside "Open questions" instead of
+            stating it up front. The check caught the author. That's the point — a habit you
+            have to remember isn't a habit.</p>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 12 · WHAT I DON'T KNOW ============ -->
+<section id="s12" class="alt">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">11</span> The honest list</p>
+    <h2>What I don't know.</h2>
+    <p class="lede">A proposal with no open questions is a proposal nobody stress-tested.</p>
+    <ul class="q" style="margin-top:24px">
+      <li class="blocker"><b>Blocker.</b> No delivery confirmation. Two responders —
+        Nightwell and Ironvale — filed "no callouts" tickets during the exact weeks the backend
+        shows them at peak volume. If that's a delivery fault, standing would show them a
+        well-designed lie. <span class="dim">Marcus. Prerequisite.</span></li>
+      <li><b>Unpriced.</b> A guaranteed look is taken from the incident — Mite at 34 minutes
+        instead of someone at 6, plus 90 seconds before cascade. That's a safety trade and
+        I've costed it at zero.</li>
+      <li><b>Scale.</b> My own threshold flags 4 of 16 at once. That's a second routing
+        policy, not a safety valve. Contention between competing guaranteed looks is undefined.</li>
+      <li><b>Undefined.</b> "The next callout Mite can do" isn't expressible: capability is
+        partial credit, ranking never filters, callouts carry no severity. Data-model change,
+        not a config change.</li>
+      <li><b>Cost.</b> This lowers acceptance rate on purpose — the headline weekly number.
+        Needs a segmented metric or an explicit agreement.</li>
+      <li><b>Scope.</b> The 90 seconds partially reverses a committed 4.2 decision.
+        Helen's call, not an implementation detail.</li>
+      <li><b>Untested.</b> Neither Kip nor any gone-quiet responder has seen this.
+        Mite's phone screen is my invention of how that week feels.</li>
+      <li><b>Not asked.</b> Wen hasn't seen it, and it answers her 2019 note by name.</li>
+    </ul>
+    <div class="card" style="margin-top:22px">
+      <h3>And one thing I got wrong</h3>
+      <p>My first draft held the arithmetic fix back so it could ship alongside the proposal.
+        That was me protecting the proposal over the product. It goes on its own, today.</p>
     </div>
   </div>
 </section>
 
 <!-- ============ 13 · ASK ============ -->
-<section class="slide" data-nav="The ask">
-  <div class="inner">
-    <div class="eyebrow rv">Where this lands</div>
-    <h2 class="rv">The ask</h2>
-
-    <div class="grid g2" style="gap:34px;align-items:start;margin-top:14px">
-      <div class="rv">
-        <div class="card" style="border-color:rgba(126,224,143,.45);margin-bottom:18px">
-          <span class="pill g">Now · no approval needed beyond Marcus</span>
-          <h3 style="margin-top:12px">Ship the arithmetic fix, decoupled from everything else</h3>
-          <p>Stop recording <code>NO_ANSWER</code> as a decline. It's a defect, it's correct on its own,
-            and holding it hostage to the bigger proposal was the wrong instinct.</p>
-        </div>
-        <ul class="clean">
-          <li><b>Marcus</b> — delivery confirmation on <code>push_to_device()</code>. Prerequisite for standing,
-            and the answer to Nightwell and Ironvale either way.</li>
-          <li><b>Wen Li</b> — one consolidated message: did the reweight apply to already-low responders,
-            and how does location actually get retrieved for proximity scoring?</li>
-          <li><b>Ravi</b> — check the 4-of-16 threshold against real scores, and agree a segmented
-            acceptance metric before anything deliberately lowers the headline number.</li>
-          <li><b>Sofia</b> — the standing card, with Aunt Dot's kitchen-counter setup as a hard constraint.</li>
-          <li><b>Helen</b> — the 90s partially reverses a committed 4.2 decision. Your call.
-            Plus: which Q3 items got squeezed out of 4.2 and quietly slipped?</li>
-        </ul>
-      </div>
-
-      <div class="rv">
-        <div class="kicker" style="margin-bottom:20px">
-          <p><strong>At the September regroup:</strong> the investigation and the proposal as
-            <i>one story</i>, not two. The 4.2 decision was right. The thing it landed on top of was not.</p>
-        </div>
-        <div class="grid g2" style="gap:14px">
-          <div class="stat g"><span class="n">1</span><span class="l">Fix shippable this afternoon</span></div>
-          <div class="stat r"><span class="n">1</span><span class="l">Blocker that outranks the proposal</span></div>
-          <div class="stat y"><span class="n">4</span><span class="l">Responders still at near-zero</span></div>
-          <div class="stat"><span class="n">0</span><span class="l">Of them can see why</span></div>
-        </div>
-        <p class="dim" style="margin-top:28px;font-size:13.5px">
-          Sources: <code>00-rook/data/callout-history.csv</code> · <code>00-rook/feedback/tickets/</code> (t-001–t-025) ·
-          <code>00-rook/feedback/interviews/</code> · <code>00-rook/code/dispatch-routing/</code> ·
-          <code>05-super-speed/</code> · <code>06-sidekicks/</code> · prompt libraries in
-          <code>01-origin-story/</code> through <code>06-sidekicks/prompts.md</code>.
-        </p>
-        <p class="dim" style="font-size:13.5px">
-          Rook Industries is a fictional teaching scenario — Product School, "Claude Code for PMs," cohort ccpm-2026.1.
-        </p>
-      </div>
+<section id="s13">
+  <div class="wrap reveal">
+    <p class="eyebrow"><span class="n">12</span> The ask</p>
+    <h2>Four things, in this order.</h2>
+    <div class="grid g2" style="margin-top:26px">
+      <div class="card"><span class="pill ship">now</span>
+        <h3 style="margin-top:10px">Ship the arithmetic fix</h3>
+        <p>Decoupled from everything else. This afternoon.</p></div>
+      <div class="card"><span class="pill block">next</span>
+        <h3 style="margin-top:10px">Marcus on delivery confirmation</h3>
+        <p>Prerequisite for standing, and the answer to Nightwell and Ironvale either way.</p></div>
+      <div class="card"><span class="pill next">then</span>
+        <h3 style="margin-top:10px">Wen on the ranking question</h3>
+        <p>One consolidated message. It's been open since 14 August and it answers her own 2019 note.</p></div>
+      <div class="card"><span class="pill next">then</span>
+        <h3 style="margin-top:10px">Ravi on the threshold, Sofia on the card</h3>
+        <p>Check 4-of-16 against real scores. Design with Dot's kitchen counter as a constraint.</p></div>
     </div>
+    <p class="lede" style="margin-top:30px">A decay constant fixes Mite's number and teaches us
+      nothing. The next time routing re-ranks someone into silence —
+      <strong>mutual aid in Q4 will do exactly this</strong> — we'd be back here with no
+      visibility and no recovery path, arguing about a different constant.</p>
+    <p class="lede"><strong style="color:var(--accent)">Standing survives the next reweight.
+      That's the whole argument.</strong></p>
+    <p class="foot">Real recommendation at the September regroup, with the investigation and
+      the proposal as one story. &nbsp;·&nbsp; Onur Arslan, PM Dispatch</p>
   </div>
 </section>
 
+<script type="text/plain" id="proto-src">PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9InV0Zi04Ij4KPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xIj4KPHRpdGxlPlJvb2sgRGlzcGF0Y2gg4oCUIFN0YW5kaW5nIChwcm90b3R5cGUpPC90aXRsZT4KPHN0eWxlPgogIDpyb290ewogICAgLS1iZzojMTExNTFjOyAtLXBhbmVsOiMxNzFkMjY7IC0tcGFuZWwyOiMxZDI1MzA7IC0tbGluZTojMjgzMjNmOwogICAgLS1pbms6I2U2ZWNmMzsgLS1kaW06IzhjOWJhZDsgLS1kaW1tZXI6IzZiN2E4YzsKICAgIC0tb2s6IzRlYTg3YTsgLS13YXJuOiNkNGEyNGM7IC0tYmFkOiNjZjZhNWE7IC0tYWNjZW50OiM1YjhmZDY7CiAgfQogIGh0bWxbZGF0YS10aGVtZT0ibGlnaHQiXXsKICAgIC0tYmc6I2Y0ZjZmODsgLS1wYW5lbDojZmZmZmZmOyAtLXBhbmVsMjojZjBmM2Y2OyAtLWxpbmU6I2Q5ZTBlODsKICAgIC0taW5rOiMxNjIwMmI7IC0tZGltOiM1ZDZiN2E7IC0tZGltbWVyOiM4NDk0YTQ7CiAgICAtLW9rOiMyZjdmNTY7IC0td2FybjojYTk3YTFlOyAtLWJhZDojYjA0YTNhOyAtLWFjY2VudDojMmY2OGIwOwogIH0KICAqe2JveC1zaXppbmc6Ym9yZGVyLWJveH0KICBib2R5e21hcmdpbjowO2JhY2tncm91bmQ6dmFyKC0tYmcpO2NvbG9yOnZhcigtLWluayk7CiAgICBmb250OjE1cHgvMS41IC1hcHBsZS1zeXN0ZW0sQmxpbmtNYWNTeXN0ZW1Gb250LCJTZWdvZSBVSSIsUm9ib3RvLHNhbnMtc2VyaWY7fQogIGhlYWRlcntib3JkZXItYm90dG9tOjFweCBzb2xpZCB2YXIoLS1saW5lKTtwYWRkaW5nOjE0cHggMjJweDsKICAgIGRpc3BsYXk6ZmxleDthbGlnbi1pdGVtczpjZW50ZXI7Z2FwOjE2cHg7ZmxleC13cmFwOndyYXA7YmFja2dyb3VuZDp2YXIoLS1wYW5lbCl9CiAgaGVhZGVyIGgxe2ZvbnQtc2l6ZToxNXB4O21hcmdpbjowO2ZvbnQtd2VpZ2h0OjYwMDtsZXR0ZXItc3BhY2luZzouMnB4fQogIGhlYWRlciAuc3Vie2NvbG9yOnZhcigtLWRpbSk7Zm9udC1zaXplOjEzcHh9CiAgLnNwYWNlcntmbGV4OjF9CiAgYnV0dG9ue2ZvbnQ6aW5oZXJpdDtjdXJzb3I6cG9pbnRlcjtib3JkZXItcmFkaXVzOjZweDtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWxpbmUpOwogICAgYmFja2dyb3VuZDp2YXIoLS1wYW5lbDIpO2NvbG9yOnZhcigtLWluayk7cGFkZGluZzo2cHggMTJweH0KICBidXR0b246aG92ZXJ7Ym9yZGVyLWNvbG9yOnZhcigtLWFjY2VudCl9CiAgYnV0dG9uLnByaW1hcnl7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQpO2JvcmRlci1jb2xvcjp2YXIoLS1hY2NlbnQpO2NvbG9yOiNmZmY7Zm9udC13ZWlnaHQ6NjAwfQogIGJ1dHRvbjpkaXNhYmxlZHtvcGFjaXR5Oi40O2N1cnNvcjpkZWZhdWx0fQogIG5hdntkaXNwbGF5OmZsZXg7Z2FwOjJweDtwYWRkaW5nOjAgMjJweDtib3JkZXItYm90dG9tOjFweCBzb2xpZCB2YXIoLS1saW5lKTtiYWNrZ3JvdW5kOnZhcigtLXBhbmVsKTtmbGV4LXdyYXA6d3JhcH0KICBuYXYgYnV0dG9ue2JvcmRlcjowO2JvcmRlci1ib3R0b206MnB4IHNvbGlkIHRyYW5zcGFyZW50O2JvcmRlci1yYWRpdXM6MDtiYWNrZ3JvdW5kOm5vbmU7CiAgICBjb2xvcjp2YXIoLS1kaW0pO3BhZGRpbmc6MTBweCAxNHB4fQogIG5hdiBidXR0b24ub257Y29sb3I6dmFyKC0taW5rKTtib3JkZXItYm90dG9tLWNvbG9yOnZhcigtLWFjY2VudCl9CiAgbWFpbntwYWRkaW5nOjIycHg7bWF4LXdpZHRoOjExMjBweDttYXJnaW46MCBhdXRvfQogIC5ub3Rle2JhY2tncm91bmQ6dmFyKC0tcGFuZWwpO2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7Ym9yZGVyLWxlZnQ6M3B4IHNvbGlkIHZhcigtLWFjY2VudCk7CiAgICBwYWRkaW5nOjEycHggMTRweDtib3JkZXItcmFkaXVzOjZweDtjb2xvcjp2YXIoLS1kaW0pO2ZvbnQtc2l6ZToxMy41cHg7bWFyZ2luLWJvdHRvbToyMHB4fQogIC5ub3RlIGJ7Y29sb3I6dmFyKC0taW5rKX0KICAuY2FyZHN7ZGlzcGxheTpncmlkO2dyaWQtdGVtcGxhdGUtY29sdW1uczoxZnIgMWZyO2dhcDoxOHB4fQogIEBtZWRpYShtYXgtd2lkdGg6ODIwcHgpey5jYXJkc3tncmlkLXRlbXBsYXRlLWNvbHVtbnM6MWZyfX0KICAuY2FyZHtiYWNrZ3JvdW5kOnZhcigtLXBhbmVsKTtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWxpbmUpO2JvcmRlci1yYWRpdXM6MTBweDtvdmVyZmxvdzpoaWRkZW59CiAgLmNhcmQgLnRvcHtwYWRkaW5nOjE0cHggMTZweDtib3JkZXItYm90dG9tOjFweCBzb2xpZCB2YXIoLS1saW5lKTsKICAgIGRpc3BsYXk6ZmxleDthbGlnbi1pdGVtczpiYXNlbGluZTtnYXA6MTBweH0KICAuY2FyZCAudG9wIGgye21hcmdpbjowO2ZvbnQtc2l6ZToxN3B4fQogIC5jYXJkIC50b3AgLndob3tjb2xvcjp2YXIoLS1kaW1tZXIpO2ZvbnQtc2l6ZToxMi41cHh9CiAgLmNhcmQgLmJvZHl7cGFkZGluZzoxNnB4fQogIC5zdGF0e2Rpc3BsYXk6ZmxleDtqdXN0aWZ5LWNvbnRlbnQ6c3BhY2UtYmV0d2VlbjtwYWRkaW5nOjdweCAwOwogICAgYm9yZGVyLWJvdHRvbToxcHggZGFzaGVkIHZhcigtLWxpbmUpO2ZvbnQtc2l6ZToxNHB4fQogIC5zdGF0Omxhc3QtY2hpbGR7Ym9yZGVyLWJvdHRvbTowfQogIC5zdGF0IHNwYW46Zmlyc3QtY2hpbGR7Y29sb3I6dmFyKC0tZGltKX0KICAuYmlne2ZvbnQtc2l6ZTozMHB4O2ZvbnQtd2VpZ2h0OjYwMDtsZXR0ZXItc3BhY2luZzotLjVweH0KICAuYmFke2NvbG9yOnZhcigtLWJhZCl9IC5va3tjb2xvcjp2YXIoLS1vayl9IC53YXJue2NvbG9yOnZhcigtLXdhcm4pfQogIC5zcGFya3tkaXNwbGF5OmZsZXg7YWxpZ24taXRlbXM6ZmxleC1lbmQ7Z2FwOjRweDtoZWlnaHQ6NTZweDttYXJnaW46MTRweCAwIDZweH0KICAuc3BhcmsgaXtmbGV4OjE7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQpO29wYWNpdHk6Ljc1O2JvcmRlci1yYWRpdXM6MnB4IDJweCAwIDA7bWluLWhlaWdodDoycHh9CiAgLnNwYXJrIGkuYWZ0ZXJ7YmFja2dyb3VuZDp2YXIoLS1kaW0pfQogIC5zcGFyayBpLmhvdHtiYWNrZ3JvdW5kOnZhcigtLW9rKX0KICAuc3BhcmsgaS5jb2xke2JhY2tncm91bmQ6dmFyKC0tYmFkKX0KICAuYXhpc3tkaXNwbGF5OmZsZXg7anVzdGlmeS1jb250ZW50OnNwYWNlLWJldHdlZW47Y29sb3I6dmFyKC0tZGltbWVyKTtmb250LXNpemU6MTFweH0KICAuc3RhbmRpbmd7bWFyZ2luLXRvcDoxNHB4O3BhZGRpbmc6MTNweCAxNHB4O2JvcmRlci1yYWRpdXM6OHB4O2JhY2tncm91bmQ6dmFyKC0tcGFuZWwyKTsKICAgIGJvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSl9CiAgLnN0YW5kaW5nLmxvd3tib3JkZXItY29sb3I6dmFyKC0tYmFkKX0KICAuc3RhbmRpbmcgaDN7bWFyZ2luOjAgMCA2cHg7Zm9udC1zaXplOjEycHg7bGV0dGVyLXNwYWNpbmc6LjdweDt0ZXh0LXRyYW5zZm9ybTp1cHBlcmNhc2U7Y29sb3I6dmFyKC0tZGltKX0KICAuc3RhbmRpbmcgcHttYXJnaW46MCAwIDhweDtmb250LXNpemU6MTRweH0KICAubWV0ZXJ7aGVpZ2h0OjdweDtib3JkZXItcmFkaXVzOjRweDtiYWNrZ3JvdW5kOnZhcigtLWxpbmUpO292ZXJmbG93OmhpZGRlbjttYXJnaW46OXB4IDB9CiAgLm1ldGVyIGl7ZGlzcGxheTpibG9jaztoZWlnaHQ6MTAwJTtib3JkZXItcmFkaXVzOjRweH0KICAud2h5e2ZvbnQtc2l6ZToxM3B4O2NvbG9yOnZhcigtLWRpbSk7bWFyZ2luOjhweCAwIDB9CiAgLnNocnVne2NvbG9yOnZhcigtLWRpbW1lcik7Zm9udC1zdHlsZTppdGFsaWM7Zm9udC1zaXplOjEzLjVweDsKICAgIGJvcmRlcjoxcHggZGFzaGVkIHZhcigtLWxpbmUpO2JvcmRlci1yYWRpdXM6OHB4O3BhZGRpbmc6MTNweCAxNHB4O21hcmdpbi10b3A6MTRweH0KICAucGhvbmV7bWF4LXdpZHRoOjMzMHB4O21hcmdpbjowIGF1dG87YmFja2dyb3VuZDp2YXIoLS1wYW5lbCk7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1saW5lKTsKICAgIGJvcmRlci1yYWRpdXM6MjZweDtwYWRkaW5nOjE2cHg7Ym94LXNoYWRvdzowIDEwcHggMzRweCByZ2JhKDAsMCwwLC4yOCl9CiAgLnBob25lIC5iYXJ7ZGlzcGxheTpmbGV4O2p1c3RpZnktY29udGVudDpzcGFjZS1iZXR3ZWVuO2NvbG9yOnZhcigtLWRpbW1lcik7CiAgICBmb250LXNpemU6MTFweDttYXJnaW4tYm90dG9tOjE0cHh9CiAgLnBob25lIGgye21hcmdpbjowIDAgM3B4O2ZvbnQtc2l6ZToxOXB4fQogIC5waG9uZSAuY292ZXJ7Y29sb3I6dmFyKC0tZGltbWVyKTtmb250LXNpemU6MTJweDttYXJnaW4tYm90dG9tOjE2cHh9CiAgLnF1aWV0e3RleHQtYWxpZ246Y2VudGVyO3BhZGRpbmc6NTJweCAxMnB4O2NvbG9yOnZhcigtLWRpbW1lcil9CiAgLnF1aWV0IC56e2ZvbnQtc2l6ZTozMHB4O29wYWNpdHk6LjV9CiAgLnR3b3tkaXNwbGF5OmdyaWQ7Z3JpZC10ZW1wbGF0ZS1jb2x1bW5zOjFmciAxZnI7Z2FwOjI2cHg7YWxpZ24taXRlbXM6c3RhcnR9CiAgQG1lZGlhKG1heC13aWR0aDo4MjBweCl7LnR3b3tncmlkLXRlbXBsYXRlLWNvbHVtbnM6MWZyfX0KICAubGJse2ZvbnQtc2l6ZToxMnB4O2xldHRlci1zcGFjaW5nOi43cHg7dGV4dC10cmFuc2Zvcm06dXBwZXJjYXNlO2NvbG9yOnZhcigtLWRpbSk7CiAgICBtYXJnaW46MCAwIDEwcHg7Zm9udC13ZWlnaHQ6NjAwfQogIHRhYmxle3dpZHRoOjEwMCU7Ym9yZGVyLWNvbGxhcHNlOmNvbGxhcHNlO2ZvbnQtc2l6ZToxMy41cHg7bWFyZ2luLXRvcDo2cHh9CiAgdGgsdGR7dGV4dC1hbGlnbjpsZWZ0O3BhZGRpbmc6N3B4IDlweDtib3JkZXItYm90dG9tOjFweCBzb2xpZCB2YXIoLS1saW5lKX0KICB0aHtjb2xvcjp2YXIoLS1kaW0pO2ZvbnQtd2VpZ2h0OjUwMDtmb250LXNpemU6MTJweH0KICB0ZC5ue3RleHQtYWxpZ246cmlnaHQ7Zm9udC12YXJpYW50LW51bWVyaWM6dGFidWxhci1udW1zfQogIHRyLm5vd3tiYWNrZ3JvdW5kOnZhcigtLXBhbmVsMil9CiAgLmxvZ3tiYWNrZ3JvdW5kOnZhcigtLXBhbmVsKTtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWxpbmUpO2JvcmRlci1yYWRpdXM6MTBweDtwYWRkaW5nOjE2cHh9CiAgLmV2e3BhZGRpbmc6MTBweCAwO2JvcmRlci1ib3R0b206MXB4IGRhc2hlZCB2YXIoLS1saW5lKTtmb250LXNpemU6MTRweDtkaXNwbGF5OmZsZXg7Z2FwOjEycHh9CiAgLmV2Omxhc3QtY2hpbGR7Ym9yZGVyLWJvdHRvbTowfQogIC5ldiAud3tjb2xvcjp2YXIoLS1kaW1tZXIpO2ZvbnQtc2l6ZToxMnB4O21pbi13aWR0aDo2MnB4O3BhZGRpbmctdG9wOjJweH0KICAuZXYuZ2Fpbntjb2xvcjp2YXIoLS1vayl9IC5ldi5sb3Nze2NvbG9yOnZhcigtLWJhZCl9CiAgLmN0bHtkaXNwbGF5OmZsZXg7Z2FwOjEwcHg7YWxpZ24taXRlbXM6Y2VudGVyO21hcmdpbjoxNnB4IDB9CiAgLnBpbGx7ZGlzcGxheTppbmxpbmUtYmxvY2s7Zm9udC1zaXplOjExcHg7bGV0dGVyLXNwYWNpbmc6LjVweDt0ZXh0LXRyYW5zZm9ybTp1cHBlcmNhc2U7CiAgICBwYWRkaW5nOjNweCA4cHg7Ym9yZGVyLXJhZGl1czoyMHB4O2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7Y29sb3I6dmFyKC0tZGltKX0KICAucGlsbC5iYWR7Ym9yZGVyLWNvbG9yOnZhcigtLWJhZCk7Y29sb3I6dmFyKC0tYmFkKX0KICAucGlsbC5va3tib3JkZXItY29sb3I6dmFyKC0tb2spO2NvbG9yOnZhcigtLW9rKX0KICBoMy5zZWN7Zm9udC1zaXplOjE1cHg7bWFyZ2luOjI2cHggMCAxMHB4fQogIHVsLnRpZ2h0e21hcmdpbjo4cHggMCAwO3BhZGRpbmctbGVmdDoyMHB4O2NvbG9yOnZhcigtLWRpbSk7Zm9udC1zaXplOjEzLjVweH0KICB1bC50aWdodCBsaXttYXJnaW4tYm90dG9tOjVweH0KICBjb2Rle2JhY2tncm91bmQ6dmFyKC0tcGFuZWwyKTtwYWRkaW5nOjFweCA1cHg7Ym9yZGVyLXJhZGl1czo0cHg7Zm9udC1zaXplOjEyLjVweH0KICBmb290ZXJ7Y29sb3I6dmFyKC0tZGltbWVyKTtmb250LXNpemU6MTIuNXB4O3BhZGRpbmc6MjZweCAyMnB4O21heC13aWR0aDoxMTIwcHg7bWFyZ2luOjAgYXV0bzsKICAgIGJvcmRlci10b3A6MXB4IHNvbGlkIHZhcigtLWxpbmUpfQogIC5iaWd0eXBle2ZvbnQtc2l6ZToxOXB4O2xpbmUtaGVpZ2h0OjEuNDV9CiAgLmJpZ3R5cGUgLnRvcCBoMntmb250LXNpemU6MjZweH0KICAuYmlndHlwZSAudG9wIC53aG97Zm9udC1zaXplOjE1cHh9CiAgLmJpZ3R5cGUgLnN0YXR7Zm9udC1zaXplOjE5cHg7cGFkZGluZzoxMXB4IDB9CiAgLmJpZ3R5cGUgLnN0YW5kaW5nIGgze2ZvbnQtc2l6ZToxNXB4fQogIC5iaWd0eXBlIC5zdGFuZGluZyBwe2ZvbnQtc2l6ZToxOXB4fQogIC5iaWd0eXBlIC53aHl7Zm9udC1zaXplOjE3cHh9CiAgLmJpZ3R5cGUgLmdsYW5jZXtmb250LXNpemU6MjNweDtmb250LXdlaWdodDo2MDA7bGluZS1oZWlnaHQ6MS4zO21hcmdpbjowIDAgNHB4fQogIC5iaWd0eXBlIC5heGlze2ZvbnQtc2l6ZToxNHB4fQogIC5iaWd0eXBlIC5zcGFya3toZWlnaHQ6NzRweH0KICAub3ZlcmxheXtwb3NpdGlvbjpmaXhlZDtpbnNldDowO2JhY2tncm91bmQ6cmdiYSgwLDAsMCwuNTUpO2Rpc3BsYXk6bm9uZTsKICAgIGFsaWduLWl0ZW1zOmZsZXgtc3RhcnQ7anVzdGlmeS1jb250ZW50OmNlbnRlcjtwYWRkaW5nOjQwcHggMjBweDtvdmVyZmxvdy15OmF1dG87ei1pbmRleDo1MH0KICAub3ZlcmxheS5vbntkaXNwbGF5OmZsZXh9CiAgLm1vZGFse2JhY2tncm91bmQ6dmFyKC0tcGFuZWwpO2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7Ym9yZGVyLXJhZGl1czoxMnB4OwogICAgbWF4LXdpZHRoOjYyMHB4O3dpZHRoOjEwMCU7Ym94LXNoYWRvdzowIDIwcHggNjBweCByZ2JhKDAsMCwwLC40NSl9CiAgLm1vZGFsIC5tdG9we3BhZGRpbmc6MTZweCAyMHB4O2JvcmRlci1ib3R0b206MXB4IHNvbGlkIHZhcigtLWxpbmUpOwogICAgZGlzcGxheTpmbGV4O2FsaWduLWl0ZW1zOmJhc2VsaW5lO2dhcDoxMHB4fQogIC5tb2RhbCAubXRvcCBoMnttYXJnaW46MDtmb250LXNpemU6MThweH0KICAubW9kYWwgLm10b3AgLndob3tjb2xvcjp2YXIoLS1kaW1tZXIpO2ZvbnQtc2l6ZToxMi41cHh9CiAgLm1vZGFsIC5tYm9keXtwYWRkaW5nOjIwcHh9CiAgLm1vZGFsIC5tZm9vdHtwYWRkaW5nOjE0cHggMjBweDtib3JkZXItdG9wOjFweCBzb2xpZCB2YXIoLS1saW5lKTsKICAgIGRpc3BsYXk6ZmxleDtnYXA6MTBweDtqdXN0aWZ5LWNvbnRlbnQ6ZmxleC1lbmR9CiAgLm1vZGFsIGg0e21hcmdpbjoxOHB4IDAgN3B4O2ZvbnQtc2l6ZToxMnB4O2xldHRlci1zcGFjaW5nOi43cHg7CiAgICB0ZXh0LXRyYW5zZm9ybTp1cHBlcmNhc2U7Y29sb3I6dmFyKC0tZGltKX0KICAubW9kYWwgaDQ6Zmlyc3QtY2hpbGR7bWFyZ2luLXRvcDowfQogIC5tb2RhbCBwe21hcmdpbjowIDAgOXB4O2ZvbnQtc2l6ZToxNHB4fQogIC54e21hcmdpbi1sZWZ0OmF1dG87YmFja2dyb3VuZDpub25lO2JvcmRlcjowO2NvbG9yOnZhcigtLWRpbSk7Zm9udC1zaXplOjIwcHg7CiAgICBsaW5lLWhlaWdodDoxO3BhZGRpbmc6MCA0cHg7Y3Vyc29yOnBvaW50ZXJ9CiAgLmNvc3R7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1iYWQpO2JvcmRlci1yYWRpdXM6OHB4O3BhZGRpbmc6MTJweCAxNHB4O2JhY2tncm91bmQ6dmFyKC0tcGFuZWwyKX0KICAuY29zdCAuc3RhdHtmb250LXNpemU6MTMuNXB4fQogIC5vcGVue21hcmdpbi10b3A6MThweDtib3JkZXItbGVmdDozcHggc29saWQgdmFyKC0td2Fybik7cGFkZGluZzoxMHB4IDEycHg7CiAgICBiYWNrZ3JvdW5kOnZhcigtLXBhbmVsMik7Ym9yZGVyLXJhZGl1czowIDZweCA2cHggMH0KICAub3BlbiBwe2ZvbnQtc2l6ZToxM3B4O2NvbG9yOnZhcigtLWRpbSk7bWFyZ2luOjAgMCA2cHh9CiAgLm9wZW4gcDpsYXN0LWNoaWxke21hcmdpbi1ib3R0b206MH0KICAub3BlbiBie2NvbG9yOnZhcigtLXdhcm4pfQogIC5jYXBze2Rpc3BsYXk6ZmxleDtnYXA6OHB4O21hcmdpbjoxMHB4IDAgNHB4O2ZsZXgtd3JhcDp3cmFwfQogIC5jYXBzIGJ1dHRvbi5zZWx7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQpO2JvcmRlci1jb2xvcjp2YXIoLS1hY2NlbnQpO2NvbG9yOiNmZmZ9CiAgLmZvcm11bGF7Zm9udC1mYW1pbHk6dWktbW9ub3NwYWNlLFNGTW9uby1SZWd1bGFyLE1lbmxvLG1vbm9zcGFjZTtmb250LXNpemU6MTNweDsKICAgIGJhY2tncm91bmQ6dmFyKC0tcGFuZWwyKTtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWxpbmUpO2JvcmRlci1yYWRpdXM6NnB4O3BhZGRpbmc6MTFweCAxM3B4OwogICAgY29sb3I6dmFyKC0tZGltKTtsaW5lLWhlaWdodDoxLjd9CiAgLmZvcm11bGEgYntjb2xvcjp2YXIoLS1pbmspfQogIC5taGVhZHtkaXNwbGF5OmZsZXg7YWxpZ24taXRlbXM6Y2VudGVyO2dhcDoxNHB4O2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7CiAgICBiYWNrZ3JvdW5kOnZhcigtLXBhbmVsKTtib3JkZXItcmFkaXVzOjEwcHg7cGFkZGluZzoxNHB4IDE2cHg7bWFyZ2luLWJvdHRvbToxNHB4fQogIC5taGVhZCBoMnttYXJnaW46MCAwIDNweDtmb250LXNpemU6MTlweH0KICAubWhlYWQgLndob3tjb2xvcjp2YXIoLS1kaW1tZXIpO2ZvbnQtc2l6ZToxMi41cHh9CiAgLm1oZWFkIC5waWxse21hcmdpbi1sZWZ0OmF1dG99CiAgLndlZWtzdHJpcHtkaXNwbGF5OmZsZXg7Z2FwOjZweDttYXJnaW4tYm90dG9tOjE2cHg7ZmxleC13cmFwOndyYXB9CiAgLndlZWtzdHJpcCBidXR0b257ZmxleDoxO21pbi13aWR0aDo3MnB4O3BhZGRpbmc6OHB4IDRweDtib3JkZXItcmFkaXVzOjdweDsKICAgIGRpc3BsYXk6ZmxleDtmbGV4LWRpcmVjdGlvbjpjb2x1bW47Z2FwOjNweDthbGlnbi1pdGVtczpjZW50ZXI7bGluZS1oZWlnaHQ6MS4yNX0KICAud2Vla3N0cmlwIGJ1dHRvbiAud2t7Zm9udC1zaXplOjExcHg7Y29sb3I6dmFyKC0tZGltbWVyKX0KICAud2Vla3N0cmlwIGJ1dHRvbiAudm9se2ZvbnQtc2l6ZToxNXB4O2ZvbnQtd2VpZ2h0OjYwMH0KICAud2Vla3N0cmlwIGJ1dHRvbi5zZWx7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQpO2JvcmRlci1jb2xvcjp2YXIoLS1hY2NlbnQpO2NvbG9yOiNmZmZ9CiAgLndlZWtzdHJpcCBidXR0b24uc2VsIC53a3tjb2xvcjpyZ2JhKDI1NSwyNTUsMjU1LC44KX0KICAud2Vla3N0cmlwIGJ1dHRvbi5yZWx7Ym94LXNoYWRvdzppbnNldCAwIC0zcHggMCB2YXIoLS13YXJuKX0KICAuc2F5Ym94e2JvcmRlci1yYWRpdXM6OHB4O3BhZGRpbmc6MTNweCAxNXB4O2ZvbnQtc2l6ZToxNC41cHg7bGluZS1oZWlnaHQ6MS41NTsKICAgIGJhY2tncm91bmQ6dmFyKC0tcGFuZWwyKTtib3JkZXItbGVmdDozcHggc29saWQgdmFyKC0tbGluZSl9CiAgLnNheWJveC5iYWR7Ym9yZGVyLWxlZnQtY29sb3I6dmFyKC0tYmFkKX0KICAuc2F5Ym94Lm9re2JvcmRlci1sZWZ0LWNvbG9yOnZhcigtLWFjY2VudCl9CiAgLnNheWJveCAuc3Jje2Rpc3BsYXk6YmxvY2s7bWFyZ2luLXRvcDo4cHg7Zm9udC1zaXplOjEyLjVweDtjb2xvcjp2YXIoLS1kaW1tZXIpfQogIHRyLnJlbCB0ZHtib3JkZXItdG9wOjJweCBzb2xpZCB2YXIoLS13YXJuKX0KICB0ci5zZWx7YmFja2dyb3VuZDp2YXIoLS1wYW5lbDIpfQogIHRyLnNlbCB0ZHtmb250LXdlaWdodDo2MDB9Cjwvc3R5bGU+CjwvaGVhZD4KPGJvZHk+Cgo8aGVhZGVyPgogIDxoMT5Sb29rIERpc3BhdGNoIMK3IFN0YW5kaW5nPC9oMT4KICA8c3BhbiBjbGFzcz0ic3ViIj5wcm90b3R5cGUgZm9yIEhlbGVuIOKAlCBub3QgYSBzcGVjLCBub3QgYnVpbHQ8L3NwYW4+CiAgPHNwYW4gY2xhc3M9InNwYWNlciI+PC9zcGFuPgogIDxidXR0b24gaWQ9InRoZW1lIj5MaWdodDwvYnV0dG9uPgo8L2hlYWRlcj4KCjxuYXY+CiAgPGJ1dHRvbiBkYXRhLXY9InRvZGF5IiBjbGFzcz0ib24iPktpcCdzIGNvbnNvbGUg4oCUIHRvZGF5PC9idXR0b24+CiAgPGJ1dHRvbiBkYXRhLXY9InByb3Bvc2VkIj5LaXAncyBjb25zb2xlIOKAlCBwcm9wb3NlZDwvYnV0dG9uPgogIDxidXR0b24gZGF0YS12PSJtaXRlIj5NZXRlb3IgTWl0ZSDigJQgd2VlayBieSB3ZWVrPC9idXR0b24+CiAgPGJ1dHRvbiBkYXRhLXY9InBob25lIj5NZXRlb3IgTWl0ZSdzIHBob25lPC9idXR0b24+CiAgPGJ1dHRvbiBkYXRhLXY9InJlY292ZXIiPldhbGsgdGhlIHJlY292ZXJ5PC9idXR0b24+CiAgPGJ1dHRvbiBkYXRhLXY9ImRvdCI+RG90J3Mga2l0Y2hlbiBjb3VudGVyPC9idXR0b24+CiAgPGJ1dHRvbiBkYXRhLXY9InVua25vd24iPldoYXQgd2UgZG9uJ3Qga25vdzwvYnV0dG9uPgo8L25hdj4KCjxtYWluPgoKPCEtLSA9PT09PT09PT09PT0gVE9EQVkgPT09PT09PT09PT09IC0tPgo8c2VjdGlvbiBpZD0idi10b2RheSI+CiAgPGRpdiBjbGFzcz0ibm90ZSI+CiAgICA8Yj5XaGF0IEtpcCBzZWVzIG5vdy48L2I+IFR3byByZXNwb25kZXJzLCBzYW1lIGNpdHksIHNhbWUgd2Vla3MsIHNpZGUgYnkgc2lkZSBvbiBoaXMKICAgIGNlbnRyZSBtb25pdG9yLiBSZWFsIG51bWJlcnMgZnJvbSA8Y29kZT5jYWxsb3V0LWhpc3RvcnkuY3N2PC9jb2RlPi4gTm90aGluZyBvbiB0aGlzCiAgICBzY3JlZW4gZXhwbGFpbnMgdGhlIGRpZmZlcmVuY2Ug4oCUIGhpcyB3b3JkczogPGk+InR3byBjYXJkcyB0aGF0IG1pZ2h0IGFzIHdlbGwgYmUgdHdvCiAgICBkaWZmZXJlbnQgcHJvZHVjdHMuIjwvaT4KICA8L2Rpdj4KICA8ZGl2IGNsYXNzPSJjYXJkcyIgaWQ9InRvZGF5Q2FyZHMiPjwvZGl2PgogIDxkaXYgY2xhc3M9InNocnVnIj4KICAgIFRoZXJlIGlzIG5vIHRoaXJkIHBhbmVsLiBUaGlzIGlzIHRoZSB3aG9sZSBzY3JlZW4uIEtpcCdzIG9ubHkgYXZhaWxhYmxlIGFjdGlvbiBpcyB0bwogICAgdGV4dCBNZXRlb3IgTWl0ZSAiaGFuZyBpbiB0aGVyZSwgaXQnbGwgcGljayB1cC4iCiAgPC9kaXY+Cjwvc2VjdGlvbj4KCjwhLS0gPT09PT09PT09PT09IFBST1BPU0VEID09PT09PT09PT09PSAtLT4KPHNlY3Rpb24gaWQ9InYtcHJvcG9zZWQiIGhpZGRlbj4KICA8ZGl2IGNsYXNzPSJub3RlIj4KICAgIDxiPjEgwrcgU3RhbmRpbmcsIGluIHBsYWluIHdvcmRzLCB3aXRoIHRoZSByZWFzb24uPC9iPiBTYW1lIHR3byBjYXJkcywgb25lIGJsb2NrIGFkZGVkIHRvCiAgICBlYWNoOiB3aGVyZSB0aGlzIHJlc3BvbmRlciBzaXRzIGluIHRoZSByYW5raW5nLCB3aHkgdGhleSdyZSB0aGVyZSwgd2hldGhlciBpdCdzCiAgICByZWNvdmVyaW5nLCBhbmQgd2hhdCB3b3VsZCBjaGFuZ2UgaXQuIFRoZSBzY29yZSB1bmRlciB0aGUgaG9vZCBpcyB1bmNoYW5nZWQg4oCUIHdlJ3JlIGp1c3QKICAgIG5vIGxvbmdlciB0aGUgb25seSBvbmVzIHdobyBjYW4gc2VlIGl0LgogIDwvZGl2PgogIDxkaXYgY2xhc3M9ImNhcmRzIiBpZD0icHJvcENhcmRzIj48L2Rpdj4KCiAgPGgzIGNsYXNzPSJzZWMiPldoYXQncyBuZXcgb24gdGhpcyBzY3JlZW48L2gzPgogIDx1bCBjbGFzcz0idGlnaHQiPgogICAgPGxpPjxiPjEgwrcgU3RhbmRpbmcgaW4gcGxhaW4gd29yZHMsIHdpdGggdGhlIHJlYXNvbi48L2I+ICJSYW5rZWQgYmVsb3cgbW9zdCBuZWFyYnkKICAgICAgICByZXNwb25kZXJzIiBiZWF0cyAiMC4xNCIg4oCUIGFuZCB0aGUgY2FyZCBzYXlzIDxpPndoeTwvaT4gdW5kZXJuZWF0aCBpdCwgaW4gYSBzZW50ZW5jZQogICAgICAgIEtpcCBjb3VsZCByZWFkIG91dCB0byBNaXRlIG92ZXIgdGhlIHBob25lLjwvbGk+CiAgICA8bGk+PGI+MiDCtyBUaGUgdHJhcCBuYW1lZCwgYW5kIGEgd2F5IG91dCBvZiBpdC48L2I+IFRoZSBjYXJkIHN0YXRlcyBvdXRyaWdodCB0aGF0CiAgICAgICAgc3RhbmRpbmcgb25seSByaXNlcyBieSBhY2NlcHRpbmcgYW4gb2ZmZXIsIGFuZCBNaXRlIGhhcyBzdG9wcGVkIGdldHRpbmcgb2ZmZXJzIOKAlAogICAgICAgIHNvIG5vdGhpbmcgcmVjb3ZlcnMgb24gaXRzIG93bi4gVGhlIGd1YXJhbnRlZWQgbG9vayBpcyB0aGUgd2F5IG91dC48L2xpPgogICAgPGxpPjxiPkRpcmVjdGlvbiwgbm90IGp1c3QgYSBsZXZlbC48L2I+IFJlY292ZXJpbmcgLyBub3QgcmVjb3ZlcmluZy4gTWl0ZSdzIGlzbid0LCBhbmQKICAgICAgICBzdHJ1Y3R1cmFsbHkgY2FuJ3QuPC9saT4KICAgIDxsaT48Yj5UaGUgR2FsZSBnZXRzIGEgY2FyZCB0b28uPC9iPiBIaWdoIHN0YW5kaW5nIGlzbid0IGEgcmV3YXJkIOKAlCB0aGUgc2FtZSBtZWNoYW5pc20KICAgICAgICB0aGF0IHN0YXJ2ZWQgTWl0ZSBpcyBvdmVybG9hZGluZyBHYWxlLCBhbmQgS2lwIHNob3VsZCBzZWUgYm90aCBoYWx2ZXMgYXMgb25lIHN0b3J5LjwvbGk+CiAgPC91bD4KICA8cCBjbGFzcz0id2h5Ij5Cb3RoIHJlc3BvbmRlcnMgYXJlIEtpcCdzLCBzYW1lIGNpdHksIHNhbWUgd2Vla3MuIFRvZGF5IGhlIGhhcyBubyB0aGlyZAogICAgIHBhbmVsIGFuZCBub3RoaW5nIHRvIHRlbGwgZWl0aGVyIG9mIHRoZW0uPC9wPgo8L3NlY3Rpb24+Cgo8IS0tID09PT09PT09PT09PSBNSVRFIERFVEFJTCA9PT09PT09PT09PT0gLS0+CjxzZWN0aW9uIGlkPSJ2LW1pdGUiIGhpZGRlbj4KICA8ZGl2IGNsYXNzPSJub3RlIj4KICAgIDxiPldoZXJlIHRoaXMgYWN0dWFsbHkgaGFwcGVucy48L2I+IEtpcCBjbGlja3MgTWV0ZW9yIE1pdGUncyBjYXJkIGFuZCBsYW5kcyBoZXJlIOKAlCB0aGUKICAgIHJlc3BvbmRlciBkZXRhaWwgcGFnZS4gVGhpcyBzY3JlZW4gZXhpc3RzIHRvZGF5IGFuZCBzaG93cyB0aGUgdG9wIHR3byByb3dzIG9ubHkuIEV2ZXJ5dGhpbmcKICAgIGJlbG93IHRoZSBkaXZpZGVyIGlzIHdoYXQgc3RhbmRpbmcgd291bGQgYWRkLiA8Yj5DbGljayBhbnkgd2VlazwvYj4gaW4gdGhlIHN0cmlwIHRvIHNlZQogICAgd2hhdCBLaXAncyBjb25zb2xlIHNhaWQgdGhhdCB3ZWVrLCBhbmQgd2hhdCBpdCB3b3VsZCBoYXZlIHNhaWQgaW5zdGVhZC4KICA8L2Rpdj4KCiAgPGRpdiBjbGFzcz0ibWhlYWQiPgogICAgPGRpdj4KICAgICAgPGgyPk1ldGVvciBNaXRlPC9oMj4KICAgICAgPHNwYW4gY2xhc3M9IndobyI+aGFuZGxlcjogS2lwIMK3IGZsaWdodCwgc3RydWN0dXJhbC1lbnRyeSDCtyByZWdpb246IHNhbWUgYXMgVGhlIEdhbGU8L3NwYW4+CiAgICA8L2Rpdj4KICAgIDxzcGFuIGNsYXNzPSJwaWxsIGJhZCIgaWQ9Im1pdGVTdGF0ZVBpbGwiPkxvdyDigJQgbm90IHJlY292ZXJpbmc8L3NwYW4+CiAgPC9kaXY+CgogIDxkaXYgY2xhc3M9IndlZWtzdHJpcCIgaWQ9Im1pdGVTdHJpcCI+PC9kaXY+CgogIDxkaXYgY2xhc3M9InR3byI+CiAgICA8ZGl2PgogICAgICA8cCBjbGFzcz0ibGJsIj5XaGF0IHRoZSBjb25zb2xlIHNob3dzIHRoaXMgd2VlayDigJQgdG9kYXk8L3A+CiAgICAgIDxkaXYgY2xhc3M9ImNhcmQiPjxkaXYgY2xhc3M9ImJvZHkiIGlkPSJtaXRlTm93Ij48L2Rpdj48L2Rpdj4KICAgIDwvZGl2PgogICAgPGRpdj4KICAgICAgPHAgY2xhc3M9ImxibCI+V2hhdCBpdCB3b3VsZCBzaG93IOKAlCBwcm9wb3NlZDwvcD4KICAgICAgPGRpdiBjbGFzcz0iY2FyZCI+PGRpdiBjbGFzcz0iYm9keSIgaWQ9Im1pdGVQcm9wIj48L2Rpdj48L2Rpdj4KICAgIDwvZGl2PgogIDwvZGl2PgoKICA8aDMgY2xhc3M9InNlYyI+V2hhdCBLaXAgaGFzIHRvIHNheSB0byBNZXRlb3IgTWl0ZSB0aGF0IHdlZWs8L2gzPgogIDxkaXYgY2xhc3M9InR3byI+CiAgICA8ZGl2PjxwIGNsYXNzPSJsYmwiPlRvZGF5PC9wPjxkaXYgY2xhc3M9InNheWJveCBiYWQiIGlkPSJtaXRlU2F5Tm93Ij48L2Rpdj48L2Rpdj4KICAgIDxkaXY+PHAgY2xhc3M9ImxibCI+UHJvcG9zZWQ8L3A+PGRpdiBjbGFzcz0ic2F5Ym94IG9rIiBpZD0ibWl0ZVNheVByb3AiPjwvZGl2PjwvZGl2PgogIDwvZGl2PgoKICA8aDMgY2xhc3M9InNlYyI+VGhlIHdob2xlIHJ1biwgZnJvbSBLaXAncyBzaWRlPC9oMz4KICA8dGFibGUgaWQ9Im1pdGVUYWJsZSI+PC90YWJsZT4KCiAgPGRpdiBjbGFzcz0ib3BlbiI+CiAgICA8cD48Yj5FdmVyeSBudW1iZXIgb24gdGhpcyBzY3JlZW4gaXMgTWV0ZW9yIE1pdGUncyByZWFsIHJvdzwvYj4gaW4KICAgICAgIDxjb2RlPmNhbGxvdXQtaGlzdG9yeS5jc3Y8L2NvZGU+LCB3ZWVrcyBvZiAyOSBKdW4gdG8gMzEgQXVnLiBUaGUgc3RhbmRpbmcgcGVyY2VudGFnZXMKICAgICAgIGFuZCByYW5rIHBvc2l0aW9ucyBhcmUgaWxsdXN0cmF0aXZlIOKAlCBJIGRvbid0IGhhdmUgYWNjZXNzIHRvIHRoZSBhY3R1YWwgc3RvcmVkIHNjb3JlcywKICAgICAgIHdoaWNoIGlzIG9uZSBvZiB0aGUgdGhpbmdzIEknZCBuZWVkIFJhdmkgZm9yLjwvcD4KICAgIDxwPjxiPk9uIHRoZSBuYW1lLjwvYj4gS2lwIG5ldmVyIHVzZXMgYSBwcm9ub3VuIGZvciBNZXRlb3IgTWl0ZSBpbiB0aGUgaW50ZXJ2aWV3IOKAlCBpdCdzCiAgICAgICAiTWl0ZSB0aGlua3MgTWl0ZSdzIGJlZW4gZm9yZ290dGVuLCIgdHdpY2UgaW4gb25lIHNlbnRlbmNlLiBJJ3ZlIGZvbGxvd2VkIHRoYXQgaGVyZSBhbmQKICAgICAgIHVzZWQgdGhlIG5hbWUgdGhyb3VnaG91dC4gRWFybGllciBkcmFmdHMgb2YgdGhpcyBwcm90b3R5cGUgc2FpZCAiaGUsIiB3aGljaCBJJ2QgaW52ZW50ZWQuCiAgICAgICBDb3ZlciBpZGVudGl0eSBpc24ndCBzb21ldGhpbmcgRGlzcGF0Y2ggc3RvcmVzLCBzbyB0aGUgY29uc29sZSBzaG91bGRuJ3QgYXNzZXJ0IGl0LjwvcD4KICA8L2Rpdj4KPC9zZWN0aW9uPgoKPCEtLSA9PT09PT09PT09PT0gUEhPTkUgPT09PT09PT09PT09IC0tPgo8c2VjdGlvbiBpZD0idi1waG9uZSIgaGlkZGVuPgogIDxkaXYgY2xhc3M9Im5vdGUiPgogICAgPGI+MyDCtyBUZWxsIHRoZSByZXNwb25kZXIgZGlyZWN0bHkuPC9iPiBNZXRlb3IgTWl0ZSBoYXMgYmVlbiB0ZXh0aW5nIEtpcCBhbGwgd2VlayBhc2tpbmcKICAgIGlmIHNvbWV0aGluZydzIGJyb2tlbi4gTm90aGluZyBpcyBicm9rZW4g4oCUIE1ldGVvciBNaXRlIGhhcyBiZWVuIHJhbmtlZCBkb3duLCBhbmQgdGhlcmUgaXMKICAgIGN1cnJlbnRseSBubyBzY3JlZW4gYW55d2hlcmUgdGhhdCB3b3VsZCBzYXkgc28uIEtpcCBjYW4ndCBzYXkgaXQgZWl0aGVyOyB0aGUgY29uc29sZQogICAgZG9lc24ndCBrbm93LiBTYW1lIGluZm9ybWF0aW9uIGFzIHRoZSBoYW5kbGVyIGNhcmQsIG9uIHRoZSBkZXZpY2UgdGhlIHNpbGVuY2UgaXMKICAgIGhhcHBlbmluZyBvbi4KICA8L2Rpdj4KICA8ZGl2IGNsYXNzPSJ0d28iPgogICAgPGRpdj4KICAgICAgPHAgY2xhc3M9ImxibCI+VG9kYXkg4oCUIDMxIEF1Z3VzdDwvcD4KICAgICAgPGRpdiBjbGFzcz0icGhvbmUiPgogICAgICAgIDxkaXYgY2xhc3M9ImJhciI+PHNwYW4+Um9vazwvc3Bhbj48c3Bhbj4yMzo0MTwvc3Bhbj48L2Rpdj4KICAgICAgICA8aDI+TWV0ZW9yIE1pdGU8L2gyPgogICAgICAgIDxkaXYgY2xhc3M9ImNvdmVyIj5BdmFpbGFibGUgwrcgZmxpZ2h0LCBzdHJ1Y3R1cmFsLWVudHJ5PC9kaXY+CiAgICAgICAgPGRpdiBjbGFzcz0icXVpZXQiPgogICAgICAgICAgPGRpdiBjbGFzcz0ieiI+4oCUIOKAlCDigJQ8L2Rpdj4KICAgICAgICAgIDxwPk5vIGNhbGxvdXRzPC9wPgogICAgICAgIDwvZGl2PgogICAgICA8L2Rpdj4KICAgICAgPHAgY2xhc3M9IndoeSIgc3R5bGU9InRleHQtYWxpZ246Y2VudGVyO21heC13aWR0aDozMzBweDttYXJnaW46MTJweCBhdXRvIDAiPgogICAgICAgIDEgb2ZmZXIgdGhpcyB3ZWVrLiAwIHRha2VuLiBObyBleHBsYW5hdGlvbiBhdmFpbGFibGUgdG8gTWV0ZW9yIE1pdGUsIHRvIEtpcCwKICAgICAgICBvciB0byBzdXBwb3J0LgogICAgICA8L3A+CiAgICA8L2Rpdj4KICAgIDxkaXY+CiAgICAgIDxwIGNsYXNzPSJsYmwiPlByb3Bvc2VkPC9wPgogICAgICA8ZGl2IGNsYXNzPSJwaG9uZSI+CiAgICAgICAgPGRpdiBjbGFzcz0iYmFyIj48c3Bhbj5Sb29rPC9zcGFuPjxzcGFuPjIzOjQxPC9zcGFuPjwvZGl2PgogICAgICAgIDxoMj5NZXRlb3IgTWl0ZTwvaDI+CiAgICAgICAgPGRpdiBjbGFzcz0iY292ZXIiPkF2YWlsYWJsZSDCtyBmbGlnaHQsIHN0cnVjdHVyYWwtZW50cnk8L2Rpdj4KICAgICAgICA8ZGl2IGNsYXNzPSJzdGFuZGluZyBsb3ciPgogICAgICAgICAgPGgzPllvdXIgc3RhbmRpbmcgPHNwYW4gY2xhc3M9InBpbGwgYmFkIj5Mb3c8L3NwYW4+PC9oMz4KICAgICAgICAgIDxwPjxiPk5vdGhpbmcgaXMgYnJva2VuLiBZb3UncmUgYmVpbmcgb2ZmZXJlZCBmZXdlciBjYWxsb3V0cyByaWdodCBub3cuPC9iPjwvcD4KICAgICAgICAgIDxkaXYgY2xhc3M9Im1ldGVyIj48aSBzdHlsZT0id2lkdGg6MTQlO2JhY2tncm91bmQ6dmFyKC0tYmFkKSI+PC9pPjwvZGl2PgogICAgICAgICAgPHAgY2xhc3M9IndoeSI+CiAgICAgICAgICAgIFNpbmNlIDEwIEF1Z3VzdCB3ZSBzZW50IHlvdSAxMSBvZmZlcnMgYW5kIDEgY2FtZSBiYWNrIGFzIGEgeWVzLiBFYWNoIG9uZSB3ZQogICAgICAgICAgICBkaWRuJ3QgaGVhciBiYWNrIG9uIG1vdmVkIHlvdSBkb3duIHRoZSBsaXN0LCBhbmQgZnVydGhlciBkb3duIHRoZSBsaXN0IG1lYW5zCiAgICAgICAgICAgIGZld2VyIG9mZmVycy4KICAgICAgICAgIDwvcD4KICAgICAgICAgIDxwIGNsYXNzPSJ3aHkiIHN0eWxlPSJtYXJnaW4tdG9wOjhweCI+CiAgICAgICAgICAgIFJpZ2h0IG5vdyB0aGUgb25seSB0aGluZyB0aGF0IG1vdmVzIHlvdSBiYWNrIHVwIGlzIGFjY2VwdGluZyBhIGNhbGxvdXQg4oCUIHdoaWNoCiAgICAgICAgICAgIGlzIHRoZSBwYXJ0IHRoYXQncyBnb3QgaGFyZGVyLiBXZSBrbm93IHRoYXQncyBhIHRyYXAuIEl0J3Mgd2h5IHRoZSBuZXh0IGJpdAogICAgICAgICAgICBleGlzdHMuCiAgICAgICAgICA8L3A+CiAgICAgICAgPC9kaXY+CiAgICAgICAgPGRpdiBjbGFzcz0ic3RhbmRpbmciIHN0eWxlPSJib3JkZXItY29sb3I6dmFyKC0tYWNjZW50KSI+CiAgICAgICAgICA8aDM+WW91ciBuZXh0IGd1YXJhbnRlZWQgbG9vayA8c3BhbiBjbGFzcz0icGlsbCBvayI+VGh1PC9zcGFuPjwvaDM+CiAgICAgICAgICA8cD5Zb3UndmUgYmVlbiBxdWlldCAyIHdlZWtzLCBzbyA8Yj50aGUgbmV4dCBjYWxsb3V0IHlvdSBjYW4gZG8gY29tZXMgdG8geW91CiAgICAgICAgICAgICBmaXJzdDwvYj4g4oCUIGFoZWFkIG9mIHRoZSByYW5raW5nLjwvcD4KICAgICAgICAgIDxwIGNsYXNzPSJ3aHkiPllvdSdsbCBnZXQgPGI+OTAgc2Vjb25kczwvYj4gdG8gYW5zd2VyIGl0IGluc3RlYWQgb2YgNjAuIFRha2UgaXQKICAgICAgICAgICAgIGFuZCB5b3VyIHN0YW5kaW5nIHN0YXJ0cyBjbGltYmluZyBiYWNrIG5vcm1hbGx5LjwvcD4KICAgICAgICAgIDxwIGNsYXNzPSJ3aHkiIHN0eWxlPSJtYXJnaW4tdG9wOjhweCI+Tm8gbmVlZCB0byBjaGVjayB3aXRoIHlvdXIgaGFuZGxlciDigJQgdGhpcwogICAgICAgICAgICAgcGFnZSBpcyB0aGUgc2FtZSB0aGluZyBLaXAgc2Vlcy48L3A+CiAgICAgICAgPC9kaXY+CiAgICAgIDwvZGl2PgogICAgICA8cCBjbGFzcz0id2h5IiBzdHlsZT0idGV4dC1hbGlnbjpjZW50ZXI7bWF4LXdpZHRoOjMzMHB4O21hcmdpbjoxMnB4IGF1dG8gMCI+CiAgICAgICAgU2FtZSBxdWlldCB3ZWVrLiBDb21wbGV0ZWx5IGRpZmZlcmVudCB3ZWVrIHRvIGxpdmUgdGhyb3VnaCDigJQgYW5kIG5vIHJlYXNvbiB0byB0ZXh0CiAgICAgICAgS2lwIGFza2luZyB3aGV0aGVyIHRoZSBhcHAgaXMgYnJva2VuLgogICAgICA8L3A+CiAgICA8L2Rpdj4KICA8L2Rpdj4KPC9zZWN0aW9uPgoKPCEtLSA9PT09PT09PT09PT0gUkVDT1ZFUiA9PT09PT09PT09PT0gLS0+CjxzZWN0aW9uIGlkPSJ2LXJlY292ZXIiIGhpZGRlbj4KICA8ZGl2IGNsYXNzPSJub3RlIj4KICAgIDxiPjIgwrcgUXVpZXQgZm9yIHR3byB3ZWVrcyDihpIgYSBjYWxsb3V0IHJlZ2FyZGxlc3Mgb2YgcmFuay48L2I+IFRvZGF5IHRoZSBvbmx5IHdheSBvdXQgb2YKICAgIGxvdyBzdGFuZGluZyBpcyBhY2NlcHRpbmcgYW4gb2ZmZXIsIGFuZCBvZmZlcnMgYXJlIGV4YWN0bHkgd2hhdCBhIGxvdy1zdGFuZGluZyByZXNwb25kZXIKICAgIGhhcyBzdG9wcGVkIHJlY2VpdmluZy4gSXQncyBhIGNsb3NlZCBsb29wLiBNaXRlIGNhbm5vdCBnZXQgb3V0IG9mIGl0IGJ5IHRyeWluZyBoYXJkZXIuCiAgICA8YnI+PGJyPgogICAgPGI+V2VuJ3MgMjAxOSBxdWVzdGlvbiwgYW5zd2VyZWQuPC9iPiA8aT4iU2hvdWxkIHRoaXMgZWFzZSBiYWNrIHRvd2FyZCBuZXV0cmFsIG9uIGl0cwogICAgb3duPyI8L2k+IOKAlCBoZXIgd29ycnkgYWdhaW5zdCBpdCBzdGlsbCBob2xkczogc29tZW9uZSB3aG8gZ2VudWluZWx5IHN0b3BwZWQgd29ya2luZwogICAgc2hvdWxkbid0IHF1aWV0bHkgY2xpbWIgYmFjay4gU286IG5vIGF1dG9tYXRpYyBkZWNheS4gSW5zdGVhZCwgYSBndWFyYW50ZWVkIGxvb2suCiAgICBZb3Ugc3RpbGwgZWFybiBpdCBiYWNrIOKAlCB3ZSBqdXN0IG1ha2Ugc3VyZSB0aGUgY2hhbmNlIHRvIGFycml2ZXMuCiAgICA8YnI+PGJyPkNsaWNrIHRocm91Z2ggdGhlIHdlZWtzLiBBcml0aG1ldGljIGlzIGlsbHVzdHJhdGl2ZQogICAgKDxjb2RlPkFDQ0VQVEFOQ0VfQ1JFRElUIDAuMDg8L2NvZGU+IC8gPGNvZGU+REVDTElORV9QRU5BTFRZIDAuMTI8L2NvZGU+LCBzdGFydGluZwogICAgc2NvcmUgYXNzdW1lZCk7IE1hcmN1cyBhbmQgUmF2aSBjYW4gcHJvZHVjZSByZWFsIG9uZXMuCiAgPC9kaXY+CgogIDxkaXYgY2xhc3M9InR3byI+CiAgICA8ZGl2PgogICAgICA8cCBjbGFzcz0ibGJsIj5NZXRlb3IgTWl0ZSdzIHN0YW5kaW5nPC9wPgogICAgICA8ZGl2IGNsYXNzPSJjYXJkIj4KICAgICAgICA8ZGl2IGNsYXNzPSJib2R5Ij4KICAgICAgICAgIDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuIGlkPSJyZWNXZWVrIj5XZWVrIG9mIDMxIEF1Zzwvc3Bhbj4KICAgICAgICAgICAgPHNwYW4gY2xhc3M9InBpbGwiIGlkPSJyZWNQaWxsIj5Mb3c8L3NwYW4+PC9kaXY+CiAgICAgICAgICA8ZGl2IGNsYXNzPSJiaWciIGlkPSJyZWNTY29yZSIgc3R5bGU9Im1hcmdpbjoxMnB4IDAgMnB4Ij4wLjE0PC9kaXY+CiAgICAgICAgICA8ZGl2IGNsYXNzPSJtZXRlciI+PGkgaWQ9InJlY0JhciIgc3R5bGU9IndpZHRoOjE0JSI+PC9pPjwvZGl2PgogICAgICAgICAgPGRpdiBjbGFzcz0ic3RhdCI+PHNwYW4+UmFuayBhbW9uZyBuZWFyYnkgcmVzcG9uZGVyczwvc3Bhbj48c3BhbiBpZD0icmVjUmFuayI+MTR0aCBvZiAxNjwvc3Bhbj48L2Rpdj4KICAgICAgICAgIDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuPk9mZmVycyB0aGF0IHdlZWs8L3NwYW4+PHNwYW4gaWQ9InJlY09mZmVycyI+MTwvc3Bhbj48L2Rpdj4KICAgICAgICAgIDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuPlJlY292ZXJzIG9uIGl0cyBvd24/PC9zcGFuPjxzcGFuIGlkPSJyZWNTZWxmIiBjbGFzcz0iYmFkIj5Obzwvc3Bhbj48L2Rpdj4KICAgICAgICA8L2Rpdj4KICAgICAgPC9kaXY+CiAgICAgIDxkaXYgY2xhc3M9ImN0bCI+CiAgICAgICAgPGJ1dHRvbiBpZD0icmVjQmFjayI+4oaQIEJhY2s8L2J1dHRvbj4KICAgICAgICA8YnV0dG9uIGlkPSJyZWNGd2QiIGNsYXNzPSJwcmltYXJ5Ij5OZXh0IHdlZWsg4oaSPC9idXR0b24+CiAgICAgICAgPGJ1dHRvbiBpZD0icmVjUmVzZXQiPlJlc2V0PC9idXR0b24+CiAgICAgIDwvZGl2PgogICAgPC9kaXY+CiAgICA8ZGl2PgogICAgICA8cCBjbGFzcz0ibGJsIj5XaGF0IGhhcHBlbmVkPC9wPgogICAgICA8ZGl2IGNsYXNzPSJsb2ciIGlkPSJyZWNMb2ciPjwvZGl2PgogICAgPC9kaXY+CiAgPC9kaXY+CgogIDxoMyBjbGFzcz0ic2VjIj5UaGUgcnVsZSwgc3RhdGVkIHBsYWlubHk8L2gzPgogIDx1bCBjbGFzcz0idGlnaHQiPgogICAgPGxpPkJlbG93IHN0YW5kaW5nIDxiPmFuZDwvYj4gdW5kZXIgfjMgb2ZmZXJzIGEgd2VlayBmb3IgdHdvIGNvbnNlY3V0aXZlIHdlZWtzIOKGkiBmbGFnZ2VkLjwvbGk+CiAgICA8bGk+TmV4dCBzdWl0YWJsZSBjYWxsb3V0IGluIHJhbmdlIHJvdXRlcyB0byB0aGVtIGZpcnN0LCBpZ25vcmluZyByYW5rLiBPbmUgcGVyIHdlZWssIGNhcHBlZC48L2xpPgogICAgPGxpPlRoYXQgb2ZmZXIgZ2V0cyB0aGUgb2xkIDxiPjkwczwvYj4gd2luZG93LCBub3QgNjAg4oCUIHRoZXkncmUgY29sZCwgbm90IHVud2lsbGluZy48L2xpPgogICAgPGxpPlRha2VuIOKGkiBub3JtYWwgY3JlZGl0LCBhbmQgdGhleSByZS1lbnRlciB0aGUgcmFua2luZyBob25lc3RseS4gTWlzc2VkIOKGkiBubyBleHRyYQogICAgICAgIHBlbmFsdHksIGJ1dCB0aGUgbmV4dCBsb29rIGlzIHRoZSB3ZWVrIGFmdGVyLCBub3QgdGhlIHNhbWUgZGF5LjwvbGk+CiAgICA8bGk+SGFuZGxlciBhbmQgcmVzcG9uZGVyIGJvdGggc2VlIGl0IGNvbWluZy4gTmFkaWEncyB0ZWFtIGNhbiBzZWUgaXQgb24gYSB0aWNrZXQuPC9saT4KICA8L3VsPgogIDxwIGNsYXNzPSJ3aHkiPlRocmVzaG9sZHMgYXJlIHBsYWNlaG9sZGVycyBmb3IgV2VuIGFuZCBTb2ZpYSwgbm90IGRlY2lzaW9ucy48L3A+Cjwvc2VjdGlvbj4KCjwhLS0gPT09PT09PT09PT09IERPVCA9PT09PT09PT09PT0gLS0+CjxzZWN0aW9uIGlkPSJ2LWRvdCIgaGlkZGVuPgogIDxkaXYgY2xhc3M9Im5vdGUiPgogICAgPGI+VGhlIGV2aWRlbmNlIEkgbmVhcmx5IGxlZnQgb3V0LjwvYj4gQXVudCBEb3QgaGFuZGxlcyBWZXNwZXIg4oCUIGFub3RoZXIgcmVzcG9uZGVyIHdobwogICAgd2VudCBxdWlldCBhZnRlciA0LjIuIFNvZmlhIGludGVydmlld2VkIGhlciBvbiAzIFNlcHQsIGFuZCBzaGUgYXJ0aWN1bGF0ZWQgdGhpcyBmZWF0dXJlCiAgICBiZWZvcmUgSSBkaWQsIHVucHJvbXB0ZWQ6CiAgICA8YnI+PGJyPgogICAgPHNwYW4gc3R5bGU9ImNvbG9yOnZhcigtLWluayk7Zm9udC1zaXplOjE2cHgiPiJNYXliZSBzb21ldGhpbmcgdGhhdCB0ZWxscyBtZSB0b28sIG5vdAogICAganVzdCBoaW3igKYgPGI+SSBkb24ndCBuZWVkIHRvIGRvIGFueXRoaW5nIGFib3V0IGl0LiBJJ2QganVzdCBsaWtlIHRvIGtub3cuPC9iPiI8L3NwYW4+CiAgICA8YnI+PGJyPgogICAgU2hlIGFsc28gc2FpZCB0aGUgdGhpbmcgdGhhdCBtYWtlcyB0aGUgY2FzZSBvbiBpdHMgb3duOiA8aT4iSSBoYWRuJ3QgcmVhbGx5IHB1dCB0aG9zZSB0d28KICAgIHRoaW5ncyBuZXh0IHRvIGVhY2ggb3RoZXIgYmVmb3JlLCB0aGUgcXVpZXQgd2Vla3MgYW5kIHRoZSBmYXN0LXZhbmlzaGluZyBvbmVzLiI8L2k+IFNoZQogICAgaGFzIGJlZW4gbGl2aW5nIGJvdGggaGFsdmVzIG9mIDQuMiDigJQgdGhlIDYwLXNlY29uZCByYWNlIGFuZCB0aGUgc2lsZW5jZSDigJQgYW5kIGhhZCBubyB3YXkKICAgIHRvIHNlZSB0aGV5IHdlcmUgdGhlIHNhbWUgc3RvcnkuIFRoYXQgY29ubmVjdGlvbiBpcyBwcmVjaXNlbHkgd2hhdCBzdGFuZGluZyBkcmF3cy4KICA8L2Rpdj4KCiAgPGRpdiBjbGFzcz0idHdvIj4KICAgIDxkaXY+CiAgICAgIDxwIGNsYXNzPSJsYmwiPlZlc3BlciDigJQgc2FtZSBkYXRhLCBLaXAncyBsYXlvdXQ8L3A+CiAgICAgIDxkaXYgaWQ9ImRvdFNtYWxsIj48L2Rpdj4KICAgICAgPHAgY2xhc3M9IndoeSIgc3R5bGU9Im1hcmdpbi10b3A6MTBweCI+VGhpcyBpcyB0aGUgY2FyZCBJIGRlc2lnbmVkLiBEb3Qgd29ya3Mgc3RhbmRpbmcKICAgICAgICBhdCBhIGtpdGNoZW4gY291bnRlciB3aXRoIHRoZSBsYXB0b3AgbmV4dCB0byB0aGUgdG9hc3Rlci4gSGVyIHdvcmRzOiA8aT4idGhlIHRleHQgaXMKICAgICAgICBzbWFsbCBlbm91Z2ggdGhhdCBmcm9tIGEgbm9ybWFsIHN0YW5kaW5nIGRpc3RhbmNlIEkgc29tZXRpbWVzIGNhbid0IHRlbGwgaWYgc29tZXRoaW5nJ3MKICAgICAgICBjaGFuZ2VkIHVubGVzcyBJIGxlYW4gcmlnaHQgaW4sIGFuZCBsZWFuaW5nIHJpZ2h0IGluIHdpdGggd2V0IGhhbmRzIG92ZXIgYSBsYXB0b3AgaXMKICAgICAgICBub3Qgc29tZXRoaW5nIEkgcmVjb21tZW5kLiI8L2k+IFNoZSBoYXMgY29uc2lkZXJlZCBidXlpbmcgcmVhZGluZyBnbGFzc2VzIGZvciB0aGlzLgogICAgICAgIDxiPlNoZSB3b3VsZCBub3QgcmVhZCBhbnkgb2YgdGhlIGFib3ZlLjwvYj48L3A+CiAgICA8L2Rpdj4KICAgIDxkaXY+CiAgICAgIDxwIGNsYXNzPSJsYmwiPlZlc3BlciDigJQgcmVhZGFibGUgZnJvbSB0d28gc3RlcHMgYmFjazwvcD4KICAgICAgPGRpdiBjbGFzcz0iYmlndHlwZSIgaWQ9ImRvdEJpZyI+PC9kaXY+CiAgICAgIDxwIGNsYXNzPSJ3aHkiIHN0eWxlPSJtYXJnaW4tdG9wOjEwcHgiPlNhbWUgaW5mb3JtYXRpb24sIG9uZSBnbGFuY2VhYmxlIGxpbmUgZmlyc3QsCiAgICAgICAgZGV0YWlsIHVuZGVybmVhdGggZm9yIHdoZW4gc2hlIGRvZXMgbGVhbiBpbi4gSWYgc3RhbmRpbmcgb25seSB3b3JrcyBvbiBLaXAncwogICAgICAgIHRocmVlLW1vbml0b3IgZGVzaywgaXQgZG9lc24ndCB3b3JrLjwvcD4KICAgIDwvZGl2PgogIDwvZGl2PgoKICA8aDMgY2xhc3M9InNlYyI+V2hhdCBEb3QgYWRkcyB0aGF0IEtpcCBkaWRuJ3Q8L2gzPgogIDx1bCBjbGFzcz0idGlnaHQiPgogICAgPGxpPjxiPkEgdGhpcmQgc3VyZmFjZS48L2I+IFNoZSB3YW50cyB0byBiZSB0b2xkLCBub3QganVzdCBoaW0g4oCUIGhlciBwcm9ibGVtIGlzIGhlYXJpbmcKICAgICAgICBhIGJ1enogdGhyb3VnaCBhIGNlaWxpbmcuIEhhbmRsZXIgbm90aWZpY2F0aW9uIGlzbid0IGluIG15IHByb3Bvc2FsIGF0IGFsbC48L2xpPgogICAgPGxpPjxiPlNoZSB2YWxpZGF0ZXMgcGllY2UgMSBhbmQgdW5kZXJjdXRzIG15IGZyYW1pbmcgb2YgaXQuPC9iPiAiSSBkb24ndCBuZWVkIHRvIGRvCiAgICAgICAgYW55dGhpbmcgYWJvdXQgaXQsIEknZCBqdXN0IGxpa2UgdG8ga25vdyIg4oCUIGtub3dpbmcgaGFzIHN0YW5kYWxvbmUgdmFsdWUuIEknZCBhcmd1ZWQKICAgICAgICBzdGFuZGluZyB3YXMgb25seSB3b3J0aCBzaGlwcGluZyBhbG9uZ3NpZGUgdGhlIGd1YXJhbnRlZWQgbG9vay4gRG90IHNheXMgb3RoZXJ3aXNlLAogICAgICAgIGFuZCBzaGUncyB0aGUgdXNlci48L2xpPgogICAgPGxpPjxiPkxlZ2liaWxpdHkgaXMgYSByZXF1aXJlbWVudCwgbm90IHBvbGlzaC48L2I+IFR3byBoYW5kbGVycywgdHdvIGNvbXBsZXRlbHkKICAgICAgICBkaWZmZXJlbnQgcGh5c2ljYWwgc2V0dXBzLCBhbmQgSSBkZXNpZ25lZCBmb3Igb25lIG9mIHRoZW0uPC9saT4KICAgIDxsaT48Yj5TaGUgbmV2ZXIgY29tcGxhaW5lZC48L2I+IFZlc3BlciB3ZW50IDE0IGNhbGxvdXRzIGEgd2VlayB0byAxIGFuZCBEb3QgZmlsZWQKICAgICAgICBub3RoaW5nIOKAlCBzaGUgYWRhcHRlZCwgYW5kIHRvbGQgaGltIHRvIGtlZXAgdGhlIHBob25lIGluIGhpcyBwb2NrZXQuIFRoZSB0aWNrZXQgcGlsZQogICAgICAgIHdvdWxkIG5ldmVyIGhhdmUgZm91bmQgaGVyLjwvbGk+CiAgPC91bD4KPC9zZWN0aW9uPgoKPCEtLSA9PT09PT09PT09PT0gVU5LTk9XTiA9PT09PT09PT09PT0gLS0+CjxzZWN0aW9uIGlkPSJ2LXVua25vd24iIGhpZGRlbj4KICA8ZGl2IGNsYXNzPSJub3RlIj4KICAgIDxiPlJlYWQgdGhpcyBiZWZvcmUgdGhlIHJlc3QuPC9iPiBIZWxlbiBhc2tlZCBmb3Igc29tZXRoaW5nIHJlYWwgcmF0aGVyIHRoYW4gdGlkeS4gVGhlCiAgICBvdGhlciB0YWJzIGxvb2sgbGlrZSBhIGZpbmlzaGVkIGZlYXR1cmU7IHRoZXkgYXJlbid0IG9uZS4gVGhlc2UgYXJlIHRoZSB0aGluZ3MgdGhhdCB3b3VsZAogICAgc3RvcCB0aGlzIGJlaW5nIGJ1aWx0LCBpbiB0aGUgb3JkZXIgdGhleSdkIHN0b3AgaXQuCiAgPC9kaXY+CgogIDxkaXYgY2xhc3M9ImxvZyI+CiAgICA8ZGl2IGNsYXNzPSJldiBsb3NzIj48c3BhbiBjbGFzcz0idyI+QmxvY2tlcjwvc3Bhbj48c3Bhbj4KICAgICAgPGI+RGlzcGF0Y2ggZG9lc24ndCBrbm93IGlmIGFuIG9mZmVyIGFycml2ZWQuPC9iPiA8Y29kZT5wdXNoX3RvX2RldmljZSgpPC9jb2RlPiByZXR1cm5zCiAgICAgIG5vdGhpbmc7IHRoZXJlJ3Mgbm8gZGVsaXZlcnkgY29uZmlybWF0aW9uIGFueXdoZXJlIGluIDxjb2RlPm9mZmVyLnB5PC9jb2RlPi4gU28gZXZlcnkKICAgICAgIjExIG9mZmVycyByZWFjaGVkIHlvdSIgb24gdGhlc2Ugc2NyZWVucyBpcyBhIGNsYWltIHRoZSBzeXN0ZW0gY2FuJ3QgbWFrZS4gTmlnaHR3ZWxsIGFuZAogICAgICBJcm9udmFsZSBmaWxlZCB0aWNrZXRzIHNheWluZyB0aGV5IGdldCBub3RoaW5nIGR1cmluZyB0aGUgZXhhY3Qgd2Vla3MgdGhlIGJhY2tlbmQgaGFzCiAgICAgIHRoZW0gYXQgdGhlIHRvcCDigJQgaWYgdGhhdCdzIGEgZGVsaXZlcnkgZmF1bHQsIHN0YW5kaW5nIHdvdWxkIHNob3cgdGhlbSBhIGNvbmZpZGVudCwKICAgICAgd2VsbC1kZXNpZ25lZCBsaWUuIE1hcmN1cyBvd25zIHRoaXMsIGFuZCBpdCdzIGEgcHJlcmVxdWlzaXRlLCBub3QgYSBjaGVjay4KICAgIDwvc3Bhbj48L2Rpdj4KCiAgICA8ZGl2IGNsYXNzPSJldiBsb3NzIj48c3BhbiBjbGFzcz0idyI+VW5wcmljZWQ8L3NwYW4+PHNwYW4+CiAgICAgIDxiPkEgZ3VhcmFudGVlZCBsb29rIGlzIHRha2VuIGZyb20gdGhlIGluY2lkZW50LjwvYj4gSWYgTWV0ZW9yIE1pdGUgaXMgMzQgbWludXRlcyBvdXQgYW5kCiAgICAgIHNvbWVvbmUgZWxzZSBpcyA2LCByb3V0aW5nIE1pdGUgZmlyc3QgY29zdHMgcmVzcG9uc2UgdGltZSDigJQgcGx1cyA5MCBzZWNvbmRzIGJlZm9yZSB0aGUKICAgICAgY2FzY2FkZSBzdGFydHMuIEluIGEgcHJvdGVjdGl2ZS1yZXNwb25zZSBwcm9kdWN0IHRoYXQncyBhIHNhZmV0eSB0cmFkZSwgYW5kIG5vdGhpbmcgaW4KICAgICAgdGhpcyBwcm90b3R5cGUgcHJpY2VzIGl0LiBOb2JvZHkgY2FuIGFwcHJvdmUgdGhlIGZlYXR1cmUgdW50aWwgd2Ugc2F5IHdoYXQgZGVsYXkgd2UncmUKICAgICAgd2lsbGluZyB0byBidXkgYSByZWNvdmVyeSB3aXRoLgogICAgPC9zcGFuPjwvZGl2PgoKICAgIDxkaXYgY2xhc3M9ImV2IGxvc3MiPjxzcGFuIGNsYXNzPSJ3Ij5TY2FsZTwvc3Bhbj48c3Bhbj4KICAgICAgPGI+SXQncyBub3Qgb25lIHJlc3BvbmRlciwgaXQncyBhIHF1YXJ0ZXIgb2YgdGhlIHJvc3Rlci48L2I+IE15IG93biB0aHJlc2hvbGQsIHJ1bgogICAgICBhZ2FpbnN0IHRoZSBDU1YgZm9yIHRoZSB3ZWVrcyBvZiAyNCBhbmQgMzEgQXVnLCBmbGFncyBGYXJsaWdodCwgTWV0ZW9yIE1pdGUsIFRoZSBVbmRlcnRvdwogICAgICBhbmQgVmVzcGVyIOKAlCA8Yj40IG9mIDE2PC9iPiBzaW11bHRhbmVvdXNseS4gQXQgdGhhdCB2b2x1bWUgdGhpcyBpc24ndCBhIHNhZmV0eSB2YWx2ZSwKICAgICAgaXQncyBhIHNlY29uZCByb3V0aW5nIHBvbGljeSwgYW5kIGNvbnRlbnRpb24gYmV0d2VlbiBjb21wZXRpbmcgZ3VhcmFudGVlZCBsb29rcyBpcwogICAgICB1bmRlZmluZWQuCiAgICA8L3NwYW4+PC9kaXY+CgogICAgPGRpdiBjbGFzcz0iZXYgbG9zcyI+PHNwYW4gY2xhc3M9InciPlVuZGVmaW5lZDwvc3Bhbj48c3Bhbj4KICAgICAgPGI+IlRoZSBuZXh0IGNhbGxvdXQgTWV0ZW9yIE1pdGUgY2FuIGRvIiBpc24ndCBhIGNvbmNlcHQgdGhlIHN5c3RlbSBoYXMuPC9iPgogICAgICA8Y29kZT5jYXBhYmlsaXR5X3Njb3JlPC9jb2RlPiBpcyBwYXJ0aWFsIGNyZWRpdCwgPGNvZGU+cmFua19mb3JfY2FsbG91dDwvY29kZT4gbmV2ZXIKICAgICAgZmlsdGVycyAoIk5vYm9keSBpcyByZW1vdmVkIGhlcmUiKSwgYW5kIGEgY2FsbG91dCBjYXJyaWVzIG5vIHNldmVyaXR5IGZpZWxkIOKAlCBzbwogICAgICAiZ2l2ZSBNaXRlIGFuIGVhc3kgb25lIHRvIHdhcm0gdXAgb24iIGNhbid0IGJlIGV4cHJlc3NlZCB3aXRob3V0IGEgZGF0YS1tb2RlbCBjaGFuZ2UuCiAgICA8L3NwYW4+PC9kaXY+CgogICAgPGRpdiBjbGFzcz0iZXYgbG9zcyI+PHNwYW4gY2xhc3M9InciPkNvc3Q8L3NwYW4+PHNwYW4+CiAgICAgIDxiPkl0IG1ha2VzIHRoZSBoZWFkbGluZSBtZXRyaWMgd29yc2UsIGRlbGliZXJhdGVseS48L2I+IEd1YXJhbnRlZWQgbG9va3Mgcm91dGUgb2ZmZXJzCiAgICAgIHRvIHRoZSBwZW9wbGUgbW9zdCBsaWtlbHkgdG8gbWlzcyB0aGVtLCB3aGljaCBkcmFncyBhY2NlcHRhbmNlIHJhdGUgZG93biDigJQgdGhlIG51bWJlcgogICAgICBSYXZpIHJlcG9ydHMgd2Vla2x5LiBOZWVkcyBlaXRoZXIgYSBzZWdtZW50ZWQgbWV0cmljIG9yIGFuIGV4cGxpY2l0IGFncmVlbWVudCB3aXRoIEhlbGVuCiAgICAgIHRoYXQgdGhpcyBpcyBqdWRnZWQgb24gZGlzdHJpYnV0aW9uIGluc3RlYWQuCiAgICA8L3NwYW4+PC9kaXY+CgogICAgPGRpdiBjbGFzcz0iZXYgbG9zcyI+PHNwYW4gY2xhc3M9InciPlNjb3BlPC9zcGFuPjxzcGFuPgogICAgICA8Yj5UaGUgOTAgc2Vjb25kcyByZW9wZW5zIGEgc2V0dGxlZCBkZWNpc2lvbi48L2I+IDQuMiBjdXQgOTDihpI2MCBvbiBwdXJwb3NlIGFuZCBwaW5nCiAgICAgIHRpbWVvdXQgdHVuaW5nIGlzIGEgY29tbWl0dGVkIFEzIGl0ZW0uIFJlc3RvcmluZyBpdCBmb3IgYSBzdWJzZXQgaXMgYSByb2FkbWFwIGNoYW5nZQogICAgICB0aGF0IGdvZXMgdGhyb3VnaCBIZWxlbiwgbm90IGFuIGltcGxlbWVudGF0aW9uIGRldGFpbCBvZiBzb21ldGhpbmcgZWxzZS4KICAgIDwvc3Bhbj48L2Rpdj4KCiAgICA8ZGl2IGNsYXNzPSJldiI+PHNwYW4gY2xhc3M9InciPlVub3duZWQ8L3NwYW4+PHNwYW4+CiAgICAgIDxiPldob3NlIGRlY2lzaW9uIGlzIGEgZ3VhcmFudGVlZCBsb29rPzwvYj4gS2lwJ3MgY2FyZCBoYXMgYSBidXR0b247IE1pdGUncyBwaG9uZSBzYXlzCiAgICAgIGl0J3MgYWxyZWFkeSBzY2hlZHVsZWQuIElmIGl0J3MgYXV0b21hdGljIHRoZSBidXR0b24gaXMgd3Jvbmc7IGlmIGl0J3MgS2lwJ3MgY2FsbCB3ZSd2ZQogICAgICBoYW5kZWQgYSBoYW5kbGVyIGF0IDJhbSBhIHJhdGlvbmluZyBkZWNpc2lvbiBiZXR3ZWVuIGhpcyBvd24gdHdvIHJlc3BvbmRlcnMgcGx1cyBhbgogICAgICBvdmVycmlkZSB0aGF0IGRlbGF5cyBpbmNpZGVudHMuCiAgICA8L3NwYW4+PC9kaXY+CgogICAgPGRpdiBjbGFzcz0iZXYiPjxzcGFuIGNsYXNzPSJ3Ij5VbnRlc3RlZDwvc3Bhbj48c3Bhbj4KICAgICAgPGI+TmVpdGhlciBvZiB0aGUgdHdvIHBlb3BsZSB0aGlzIGlzIGZvciBoYXMgc2VlbiBpdC48L2I+IEtpcCBleHBsaWNpdGx5IGRlY2xpbmVkIHRvCiAgICAgIHNwZWNpZnkgd2hhdCBoZSdkIHdhbnQg4oCUIDxpPiJJIGRvbid0IGV2ZW4ga25vdyB3aGF0IEknZCB3YW50IGl0IHRvIHRlbGwgbWXigKYgSSdtIG5vdCB0aGUKICAgICAgcGVyc29uIHRvIGFzayBhYm91dCB0aGF0IHBhcnQiPC9pPiDigJQgYW5kIHdoYXQgaGUgZGlkIGFzayBmb3IsIGZvdXIgdGltZXMsIGlzIGRhcmsgbW9kZS4KICAgICAgTm8gcmVzcG9uZGVyIHdobyBoYXMgZ29uZSBxdWlldCBoYXMgZXZlciBiZWVuIGludGVydmlld2VkOyBNZXRlb3IgTWl0ZSdzIHNjcmVlbiBpcyBteQogICAgICBpbnZlbnRpb24gb2YgaG93IHRoYXQgd2VlayBmZWVscy4gRG90IGlzIHRoZSBvbmx5IGRpcmVjdCBldmlkZW5jZSB0aGF0IHN0YW5kaW5nIGlzCiAgICAgIHdhbnRlZC4KICAgIDwvc3Bhbj48L2Rpdj4KCiAgICA8ZGl2IGNsYXNzPSJldiI+PHNwYW4gY2xhc3M9InciPk5vdCBhc2tlZDwvc3Bhbj48c3Bhbj4KICAgICAgPGI+V2VuIGhhc24ndCBzZWVuIHRoaXMuPC9iPiBUaGUgcmVjb3ZlcnkgdGFiIGFuc3dlcnMgaGVyIDIwMTkgbm90ZSBieSBuYW1lLCBpbiBhCiAgICAgIGRvY3VtZW50IGdvaW5nIHRvIGhlciBkaXJlY3Rvciwgd2hpbGUgc2hlJ3MgYmFjayBmcm9tIFBUTyB3aXRoIG15IHF1ZXN0aW9ucyBzdGlsbAogICAgICB1bnNlbnQuIFNoZSdzIHRoZSBvbmx5IHNvdXJjZSBvZiB0cnV0aCBvbiByb3V0aW5nLgogICAgPC9zcGFuPjwvZGl2PgoKICAgIDxkaXYgY2xhc3M9ImV2Ij48c3BhbiBjbGFzcz0idyI+UGx1bWJpbmc8L3NwYW4+PHNwYW4+CiAgICAgIDxjb2RlPmhpc3RvcnkucHk8L2NvZGU+IGhvbGRzIHNjb3JlcyBpbiBhIG1vZHVsZS1sZXZlbCBkaWN0IHdpdGggbm8gcGVyc2lzdGVuY2UsIHNvCiAgICAgICJzaW5jZSAxMCBBdWciIGlzIGhpc3Rvcnkgd2UgZG9uJ3QgY3VycmVudGx5IHN0b3JlLiBBbmQgd2hldGhlciBzdGFuZGluZyBiZWxvbmdzIGluIHRoZQogICAgICBSZXNwb25kZXIgQXZhaWxhYmlsaXR5IFJlY29yZCBtYXR0ZXJzIOKAlCBTdXBwbHkgcmVhZHMgaXQsIGFuZCBxdWFydGVybWFzdGVycyBwcm9iYWJseQogICAgICBzaG91bGRuJ3Qgc2VlIGl0LgogICAgPC9zcGFuPjwvZGl2PgogIDwvZGl2PgoKICA8aDMgY2xhc3M9InNlYyI+V2hhdCBJJ2QgdGVsbCBIZWxlbjwvaDM+CiAgPHAgY2xhc3M9IndoeSIgc3R5bGU9ImZvbnQtc2l6ZToxNC41cHgiPgogICAgTGV0IGVuZ2luZWVyaW5nIHNoaXAgdGhlIHRpbWVvdXQtdnMtZGVjbGluZSBmaXguIEl0J3MgYSByZWFsIGRlZmVjdCwgaXQncyBjb3JyZWN0IG9uIGl0cwogICAgb3duIG1lcml0cywgYW5kIGhvbGRpbmcgaXQgaG9zdGFnZSB0byB0aGlzIHByb3Bvc2FsIHdvdWxkIGJlIG1lIHByb3RlY3RpbmcgbXkgaWRlYSByYXRoZXIKICAgIHRoYW4gdGhlIHByb2R1Y3QuIFN0YW5kaW5nIGlzIHRoZSBzbG93ZXIsIHNlcGFyYXRlIGNvbnZlcnNhdGlvbiDigJQgYW5kIGl0IHN0YXlzIGEgZGlyZWN0aW9uCiAgICByYXRoZXIgdGhhbiBhIHBsYW4gdW50aWwgdGhlIGNvc3Qgc2lkZSBhYm92ZSBoYXMgYW5zd2Vycy4KICA8L3A+Cjwvc2VjdGlvbj4KCjwhLS0gPT09PT09PT09PT09IE1PREFMOiBHVUFSQU5URUVEIExPT0sgPT09PT09PT09PT09IC0tPgo8ZGl2IGNsYXNzPSJvdmVybGF5IiBpZD0ibS1sb29rIj4KICA8ZGl2IGNsYXNzPSJtb2RhbCI+CiAgICA8ZGl2IGNsYXNzPSJtdG9wIj48aDI+U2NoZWR1bGUgYSBndWFyYW50ZWVkIGxvb2s8L2gyPgogICAgICA8c3BhbiBjbGFzcz0id2hvIj5NZXRlb3IgTWl0ZSDCtyBoYW5kbGVyOiBLaXA8L3NwYW4+CiAgICAgIDxidXR0b24gY2xhc3M9IngiIGRhdGEtY2xvc2U+JnRpbWVzOzwvYnV0dG9uPjwvZGl2PgogICAgPGRpdiBjbGFzcz0ibWJvZHkiPgogICAgICA8aDQ+V2hhdCB0aGlzIGRvZXM8L2g0PgogICAgICA8cD5UaGUgbmV4dCBjYWxsb3V0IE1ldGVvciBNaXRlIGlzIHF1YWxpZmllZCBmb3IsIHdpdGhpbiA0NSBtaW51dGVzLCBnb2VzIHRvCiAgICAgICAgIE1ldGVvciBNaXRlIDxiPmZpcnN0PC9iPiDigJQgYWhlYWQgb2YgdGhlIHJhbmtpbmcuIE9uZSBvZmZlciBvbmx5LCB3aXRoCiAgICAgICAgIDxiPjkwIHNlY29uZHM8L2I+IHRvIGFuc3dlciBpbnN0ZWFkIG9mIDYwLjwvcD4KICAgICAgPHA+VGFrZW4sIG5vcm1hbCBjcmVkaXQgYXBwbGllcyBhbmQgTWV0ZW9yIE1pdGUgcmUtZW50ZXJzIHRoZSByYW5raW5nIG9uIG1lcml0LgogICAgICAgICBNaXNzZWQsIG5vIGV4dHJhIHBlbmFsdHksIGFuZCB0aGUgbmV4dCBsb29rIGlzIGluIDcgZGF5cy48L3A+CgogICAgICA8aDQ+V2hhdCBpdCBjb3N0czwvaDQ+CiAgICAgIDxkaXYgY2xhc3M9ImNvc3QiPgogICAgICAgIDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuPlJlc3BvbmRlcnMgTWV0ZW9yIE1pdGUgaXMgcm91dGVkIGFoZWFkIG9mPC9zcGFuPjxzcGFuPnVwIHRvIDM8L3NwYW4+PC9kaXY+CiAgICAgICAgPGRpdiBjbGFzcz0ic3RhdCI+PHNwYW4+RXN0aW1hdGVkIGFkZGVkIHRyYXZlbCB0aW1lIHRvIHRoZSBpbmNpZGVudDwvc3Bhbj4KICAgICAgICAgIDxzcGFuIGNsYXNzPSJiYWQiPisxMiB0byArMjggbWluPC9zcGFuPjwvZGl2PgogICAgICAgIDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuPkFkZGVkIGRlbGF5IGJlZm9yZSBjYXNjYWRlLCBpZiB1bmFuc3dlcmVkPC9zcGFuPgogICAgICAgICAgPHNwYW4gY2xhc3M9ImJhZCI+KzkwIHNlYzwvc3Bhbj48L2Rpdj4KICAgICAgICA8ZGl2IGNsYXNzPSJzdGF0Ij48c3Bhbj5FZmZlY3Qgb24gdGhpcyB3ZWVrJ3MgYWNjZXB0YW5jZSByYXRlPC9zcGFuPgogICAgICAgICAgPHNwYW4gY2xhc3M9Indhcm4iPmxpa2VseSBkb3duPC9zcGFuPjwvZGl2PgogICAgICA8L2Rpdj4KICAgICAgPHAgY2xhc3M9IndoeSIgc3R5bGU9Im1hcmdpbi10b3A6OXB4Ij5UaGlzIGlzIHRoZSBwYXJ0IHRoZSBvbmUtcGFnZXIgb3JpZ2luYWxseQogICAgICAgICBjb3N0ZWQgYXQgemVyby4gQSBndWFyYW50ZWVkIGxvb2sgaXNuJ3QgZnJlZSDigJQgaXQncyB0YWtlbiBmcm9tIHRoZSBpbmNpZGVudCwgYW5kCiAgICAgICAgIGluIGEgcHJvdGVjdGl2ZS1yZXNwb25zZSBwcm9kdWN0IHRoYXQncyBhIHJlYWwgdHJhZGUuPC9wPgoKICAgICAgPGg0PkV4cGlyZXM8L2g0PgogICAgICA8cD5JZiBubyBxdWFsaWZ5aW5nIGNhbGxvdXQgY29tZXMgdXAgd2l0aGluIDcgZGF5cywgdGhlIGxvb2sgbGFwc2VzIGFuZCBNZXRlb3IgTWl0ZSBpcwogICAgICAgICByZS1mbGFnZ2VkLjwvcD4KCiAgICAgIDxkaXYgY2xhc3M9Im9wZW4iPgogICAgICAgIDxwPjxiPk9wZW4g4oCUIHdobyBhdXRob3Jpc2VzIHRoaXM/PC9iPiBUaGlzIHNjcmVlbiBhc3N1bWVzIGl0J3MgS2lwJ3MgY2FsbC4gSXQgY291bGQKICAgICAgICAgICBlcXVhbGx5IGJlIGF1dG9tYXRpYy4gQm90aCBhcmUgY3VycmVudGx5IGluIHRoZSBwcm90b3R5cGUsIHdoaWNoIGlzIGEKICAgICAgICAgICBjb250cmFkaWN0aW9uLCBub3QgYSBkZXNpZ24uIElmIGl0J3MgS2lwJ3MsIHdlJ3ZlIGhhbmRlZCBhIGhhbmRsZXIgYXQgMmFtIGEKICAgICAgICAgICByYXRpb25pbmcgZGVjaXNpb24gYmV0d2VlbiBoaXMgb3duIHR3byByZXNwb25kZXJzIHRoYXQgYWxzbyBkZWxheXMgYW4gaW5jaWRlbnQuPC9wPgogICAgICAgIDxwPjxiPk9wZW4g4oCUICJxdWFsaWZpZWQgZm9yIiBpc24ndCBhIHRoaW5nIHJvdXRpbmcgY2FuIGV4cHJlc3MuPC9iPgogICAgICAgICAgIDxjb2RlPmNhcGFiaWxpdHlfc2NvcmU8L2NvZGU+IGlzIHBhcnRpYWwgY3JlZGl0IGFuZCA8Y29kZT5yYW5rX2Zvcl9jYWxsb3V0PC9jb2RlPgogICAgICAgICAgIG5ldmVyIGZpbHRlcnMuIEFuZCB3aXRoIG5vIHNldmVyaXR5IGZpZWxkIG9uIGEgY2FsbG91dCwgd2UgY2FuJ3QgcHJlZmVyIGEKICAgICAgICAgICBsb3dlci1zdGFrZXMgaW5jaWRlbnQgZm9yIHNvbWVvbmUgd2FybWluZyBiYWNrIHVwLjwvcD4KICAgICAgICA8cD48Yj5PcGVuIOKAlCBNaXRlIGlzbid0IHRoZSBvbmx5IG9uZSBvd2VkIG9uZS48L2I+IEZhcmxpZ2h0LCBUaGUgVW5kZXJ0b3cgYW5kIFZlc3BlcgogICAgICAgICAgIGFsbCBxdWFsaWZ5IGluIHRoZSBzYW1lIHdlZWtzLiBDb250ZW50aW9uIGJldHdlZW4gY29tcGV0aW5nIGxvb2tzIGlzIHVuZGVmaW5lZC48L3A+CiAgICAgIDwvZGl2PgogICAgPC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJtZm9vdCI+PGJ1dHRvbiBkYXRhLWNsb3NlPkNhbmNlbDwvYnV0dG9uPgogICAgICA8YnV0dG9uIGNsYXNzPSJwcmltYXJ5IiBkYXRhLWNsb3NlPkNvbmZpcm0g4oCUIHNjaGVkdWxlIGZvciBUaHVyc2RheTwvYnV0dG9uPjwvZGl2PgogIDwvZGl2Pgo8L2Rpdj4KCjwhLS0gPT09PT09PT09PT09IE1PREFMOiBFWFBMQUlOID09PT09PT09PT09PSAtLT4KPGRpdiBjbGFzcz0ib3ZlcmxheSIgaWQ9Im0tZXhwbGFpbiI+CiAgPGRpdiBjbGFzcz0ibW9kYWwiPgogICAgPGRpdiBjbGFzcz0ibXRvcCI+PGgyPldoYXQgZG9lcyBzdGFuZGluZyBtZWFuPzwvaDI+CiAgICAgIDxzcGFuIGNsYXNzPSJ3aG8iPnBsYWluLWxhbmd1YWdlIGV4cGxhaW5lcjwvc3Bhbj4KICAgICAgPGJ1dHRvbiBjbGFzcz0ieCIgZGF0YS1jbG9zZT4mdGltZXM7PC9idXR0b24+PC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJtYm9keSI+CiAgICAgIDxoND5Ib3cgRGlzcGF0Y2ggZGVjaWRlcyB3aG8gdG8gYXNrIGZpcnN0PC9oND4KICAgICAgPHA+RXZlcnkgYXZhaWxhYmxlIHJlc3BvbmRlciBnZXRzIGEgc2NvcmUgZm9yIGVhY2ggY2FsbG91dC4gSGlnaGVzdCBzY29yZSBpcyBhc2tlZAogICAgICAgICBmaXJzdDsgaWYgdGhleSBkb24ndCBzYXkgeWVzLCB3ZSBtb3ZlIGRvd24gdGhlIGxpc3QuIFRocmVlIHRoaW5ncyBnbyBpbnRvIGl0OjwvcD4KICAgICAgPGRpdiBjbGFzcz0iZm9ybXVsYSI+CiAgICAgICAgPGI+NjAlPC9iPiAmbmJzcDtob3cgY2xvc2UgdGhleSBhcmUgJm5ic3A7PHNwYW4gc3R5bGU9Im9wYWNpdHk6LjYiPuKAlCB3YXMgNDUlIGJlZm9yZSA0LjI8L3NwYW4+PGJyPgogICAgICAgIDxiPjI1JTwvYj4gJm5ic3A7aG93IG9mdGVuIHRoZXkndmUgYmVlbiBhY2NlcHRpbmcgbGF0ZWx5ICZuYnNwOzxzcGFuIHN0eWxlPSJvcGFjaXR5Oi42Ij7igJQgd2FzIDQwJTwvc3Bhbj48YnI+CiAgICAgICAgPGI+MTUlPC9iPiAmbmJzcDt3aGV0aGVyIHRoZXkgY2FuIGRvIHRoaXMga2luZCBvZiB3b3JrICZuYnNwOzxzcGFuIHN0eWxlPSJvcGFjaXR5Oi42Ij7igJQgdW5jaGFuZ2VkIHNpbmNlIDQuMDwvc3Bhbj4KICAgICAgPC9kaXY+CiAgICAgIDxwIGNsYXNzPSJ3aHkiIHN0eWxlPSJtYXJnaW4tdG9wOjlweCI+Q2xvc2VuZXNzIGlzbid0IHBhc3MvZmFpbCDigJQgaXQgZmFsbHMgb2ZmIHN0ZWFkaWx5CiAgICAgICAgIHdpdGggdHJhdmVsIHRpbWUgYW5kIGhpdHMgemVybyBhdCA0NSBtaW51dGVzLiBGaXZlIG1pbnV0ZXMgb3V0IGFuZCBmb3J0eSBtaW51dGVzCiAgICAgICAgIG91dCBhcmUgdmVyeSBkaWZmZXJlbnQgc2NvcmVzLjwvcD4KCiAgICAgIDxoND5TdGFuZGluZyBpcyB0aGUgbWlkZGxlIG9uZTwvaDQ+CiAgICAgIDxwPkV2ZXJ5b25lIHN0YXJ0cyBhdCAwLjUuIEFjY2VwdCBhIGNhbGxvdXQgYW5kIGl0IGdvZXMgPGI+dXAgMC4wODwvYj4uIFR1cm4gb25lIGRvd24KICAgICAgICAg4oCUIDxpPm9yIGRvbid0IGFuc3dlciBpbiB0aW1lPC9pPiDigJQgYW5kIGl0IGdvZXMgPGI+ZG93biAwLjEyPC9iPi4gVGhvc2UgdHdvIGFyZQogICAgICAgICBjdXJyZW50bHkgc2NvcmVkIGlkZW50aWNhbGx5LCB3aGljaCBpcyB0aGUgZGVmZWN0IGVuZ2luZWVyaW5nIGlzIGZpeGluZy48L3A+CgogICAgICA8aDQ+V2h5IGl0IGRvZXNuJ3QgY29tZSBiYWNrIG9uIGl0cyBvd248L2g0PgogICAgICA8cD5UaGVyZSBpcyBubyBkZWNheS4gU3RhbmRpbmcgb25seSByaXNlcyB3aGVuIHNvbWVvbmUgYWNjZXB0cyBhbiBvZmZlciDigJQgYW5kIGEgbG93CiAgICAgICAgIHN0YW5kaW5nIG1lYW5zIGZld2VyIG9mZmVycyBhcnJpdmUuIEZld2VyIG9mZmVycywgZmV3ZXIgY2hhbmNlcyB0byByZWNvdmVyLCBhbmQgYW55CiAgICAgICAgIHJhcmUgb2ZmZXIgaXMgbGlrZWxpZXIgdG8gbGFwc2UgaW4gNjAgc2Vjb25kcyBhbnl3YXkuIEl0IGlzIGEgb25lLXdheSB0cmFwLCBhbmQKICAgICAgICAgbm90aGluZyBpbiB0aGUgc3lzdGVtIHJldmVyc2VzIGl0LjwvcD4KCiAgICAgIDxoND5XaGF0IDQuMiBjaGFuZ2VkPC9oND4KICAgICAgPHA+Q2xvc2VuZXNzIHN0YXJ0ZWQgY291bnRpbmcgbW9yZSBhbmQgc3RhbmRpbmcgbGVzcywgYW5kIHRoZSBhbnN3ZXIgd2luZG93IHdlbnQgZnJvbQogICAgICAgICA5MCB0byA2MCBzZWNvbmRzLiBOb2JvZHkncyBzdGFuZGluZyB3YXMgcmVzZXQgYXQgdGhlIHJlbGVhc2Ug4oCUIHdoYXRldmVyIHNjb3JlIGEKICAgICAgICAgcmVzcG9uZGVyIHdhcyBjYXJyeWluZyBjYXJyaWVkIHN0cmFpZ2h0IG92ZXIuPC9wPgoKICAgICAgPGRpdiBjbGFzcz0ib3BlbiI+CiAgICAgICAgPHA+PGI+VGhpcyBwYW5lbCBpcyB0aGUgcm91dGluZyBkb2N1bWVudGF0aW9uIHRoYXQgZG9lc24ndCBleGlzdC48L2I+IFRoZXJlIGlzIG5vCiAgICAgICAgICAgd3JpdHRlbiBzcGVjIGZvciBob3cgcmFua2luZyBkZWNpZGVzIHdobyBnZXRzIHBpbmdlZCDigJQgaXQncyBhIGtub3duIG9wZW4gaXRlbS4KICAgICAgICAgICBIYWxmIHRoZSB2YWx1ZSBvZiBidWlsZGluZyB0aGlzIHNjcmVlbiBpcyB0aGF0IGl0IGZvcmNlcyBvbmUgdG8gZXhpc3QuPC9wPgogICAgICAgIDxwPjxiPldlbiBoYXMgdG8gY29uZmlybSBldmVyeSBsaW5lIGFib3ZlIGJlZm9yZSBpdCBzaGlwcy48L2I+IEl0J3MgYXNzZW1ibGVkIGZyb20KICAgICAgICAgICByZWFkaW5nIDxjb2RlPnJvdXRpbmcucHk8L2NvZGU+LCA8Y29kZT5oaXN0b3J5LnB5PC9jb2RlPiBhbmQKICAgICAgICAgICA8Y29kZT5jb25maWcucHk8L2NvZGU+LCBub3QgZnJvbSBhbnlvbmUgd2hvIGJ1aWx0IGl0LiBQdWJsaXNoaW5nIGEgY29uZmlkZW50CiAgICAgICAgICAgZXhwbGFuYXRpb24gdGhhdCB0dXJucyBvdXQgdG8gYmUgd3JvbmcgaXMgd29yc2UgdGhhbiBwdWJsaXNoaW5nIG5vdGhpbmcuPC9wPgogICAgICA8L2Rpdj4KICAgIDwvZGl2PgogICAgPGRpdiBjbGFzcz0ibWZvb3QiPjxidXR0b24gY2xhc3M9InByaW1hcnkiIGRhdGEtY2xvc2U+Q2xvc2U8L2J1dHRvbj48L2Rpdj4KICA8L2Rpdj4KPC9kaXY+Cgo8IS0tID09PT09PT09PT09PSBNT0RBTDogQ0FQID09PT09PT09PT09PSAtLT4KPGRpdiBjbGFzcz0ib3ZlcmxheSIgaWQ9Im0tY2FwIj4KICA8ZGl2IGNsYXNzPSJtb2RhbCI+CiAgICA8ZGl2IGNsYXNzPSJtdG9wIj48aDI+Q2FwIHdlZWtseSB2b2x1bWU8L2gyPgogICAgICA8c3BhbiBjbGFzcz0id2hvIj5UaGUgR2FsZSDCtyBoYW5kbGVyOiBLaXA8L3NwYW4+CiAgICAgIDxidXR0b24gY2xhc3M9IngiIGRhdGEtY2xvc2U+JnRpbWVzOzwvYnV0dG9uPjwvZGl2PgogICAgPGRpdiBjbGFzcz0ibWJvZHkiPgogICAgICA8cD5UaGUgR2FsZSBpcyBhdCA8Yj4yMSBjYWxsb3V0cyB0aGlzIHdlZWs8L2I+LCB1cCBmcm9tIDEzIGJlZm9yZSA0LjIuIENhcHBpbmcgc3RvcHMKICAgICAgICAgRGlzcGF0Y2ggb2ZmZXJpbmcgcGFzdCB0aGUgbGltaXQgZm9yIHRoZSByZXN0IG9mIHRoZSB3ZWVrLjwvcD4KCiAgICAgIDxoND5XZWVrbHkgbGltaXQ8L2g0PgogICAgICA8ZGl2IGNsYXNzPSJjYXBzIiBpZD0iY2FwQnRucyI+PC9kaXY+CgogICAgICA8aDQ+V2hlcmUgdGhvc2UgY2FsbG91dHMgZ28gaW5zdGVhZDwvaDQ+CiAgICAgIDxkaXYgaWQ9ImNhcE91dCI+PC9kaXY+CgogICAgICA8ZGl2IGNsYXNzPSJvcGVuIiBpZD0iY2FwTm90ZSI+PC9kaXY+CiAgICA8L2Rpdj4KICAgIDxkaXYgY2xhc3M9Im1mb290Ij48YnV0dG9uIGRhdGEtY2xvc2U+Q2FuY2VsPC9idXR0b24+CiAgICAgIDxidXR0b24gY2xhc3M9InByaW1hcnkiIGRhdGEtY2xvc2U+QXBwbHkgY2FwPC9idXR0b24+PC9kaXY+CiAgPC9kaXY+CjwvZGl2PgoKPGZvb3Rlcj4KICBQcm90b3R5cGUsIDIyIFNlcHQgMjAyNiDigJQgT251ciwgUE0gRGlzcGF0Y2guIE51bWJlcnMgZnJvbQogIDxjb2RlPjAwLXJvb2svZGF0YS9jYWxsb3V0LWhpc3RvcnkuY3N2PC9jb2RlPjsgcXVvdGVzIGZyb20gS2lwJ3MgNCBTZXB0IGludGVydmlldyB3aXRoCiAgU29maWEuIERhcmsgYnkgZGVmYXVsdCBiZWNhdXNlIHRoYXQncyBob3cgS2lwIHdvcmtzIGF0IDExcG0g4oCUIHRoZSBhY3R1YWwgZGFyay1tb2RlIGFzawogIGJlbG9uZ3MgdG8gU29maWEncyBjb25zb2xlIHJlZGVzaWduLCBub3QgdGhpcy4KICA8YnI+PGJyPgogIDxiPkJsb2NrZWQgb24gb25lIGNoZWNrIGJlZm9yZSBhbnkgb2YgdGhpcyBpcyB3b3J0aCBidWlsZGluZzo8L2I+IE5pZ2h0d2VsbCBhbmQgSXJvbnZhbGUKICBmaWxlZCB0aWNrZXRzIHNheWluZyB0aGV5IHJlY2VpdmUgbm90aGluZyBkdXJpbmcgdGhlIGV4YWN0IHdlZWtzIHRoZSBiYWNrZW5kIHJlY29yZHMgdGhlbQogIGF0IHRoZSB0b3Agb2YgdGhlIGZpbGUuIElmIG9mZmVycyBhcmVuJ3QgcmVhY2hpbmcgcGhvbmVzLCBzdGFuZGluZyBleHBsYWlucyBhIG51bWJlciB0aGF0CiAgaXNuJ3QgdGhlIHByb2JsZW0uIE1hcmN1cyBydWxlcyBvdXQgbm90aWZpY2F0aW9uIGRlbGl2ZXJ5IGZpcnN0Lgo8L2Zvb3Rlcj4KCjwvbWFpbj4KCjxzY3JpcHQ+CmNvbnN0IFdFRUtTID0gWyIyOSBKdW4iLCI2IEp1bCIsIjEzIEp1bCIsIjIwIEp1bCIsIjI3IEp1bCIsIjMgQXVnIiwiMTAgQXVnIiwiMTcgQXVnIiwiMjQgQXVnIiwiMzEgQXVnIl07CmNvbnN0IE1JVEUgPSBbWzExLDddLFsxMiw5XSxbMTAsNl0sWzExLDddLFsxMiw5XSxbMTEsOF0sWzEwLDRdLFs0LDFdLFsyLDBdLFsxLDBdXTsKY29uc3QgR0FMRSA9IFtbMTMsMTBdLFsxMiw5XSxbMTMsMTBdLFsxNCwxMV0sWzEzLDExXSxbMTMsMTBdLFsxNSw5XSxbMTcsMTJdLFsyMCwxNF0sWzIxLDE2XV07CmNvbnN0IFJFTEVBU0UgPSA2OyAvLyB3ZWVrIG9mIDEwIEF1ZyBjb250YWlucyB0aGUgMTIgQXVnIHJlbGVhc2UKCmZ1bmN0aW9uIHNwYXJrKHJvd3MsIHRvbmUpewogIGNvbnN0IG1heCA9IE1hdGgubWF4KC4uLnJvd3MubWFwKHI9PnJbMF0pKTsKICByZXR1cm4gJzxkaXYgY2xhc3M9InNwYXJrIj4nICsgcm93cy5tYXAoKHIsaSk9PnsKICAgIGNvbnN0IGNscyA9IGkgPCBSRUxFQVNFID8gJycgOiAodG9uZT09PSdob3QnID8gJ2hvdCcgOiAnY29sZCcpOwogICAgcmV0dXJuIGA8aSBjbGFzcz0iJHtjbHN9IiBzdHlsZT0iaGVpZ2h0OiR7TWF0aC5yb3VuZChyWzBdL21heCoxMDApfSUiIHRpdGxlPSIke1dFRUtTW2ldfTogJHtyWzBdfSBvZmZlcnMsICR7clsxXX0gdGFrZW4iPjwvaT5gOwogIH0pLmpvaW4oJycpICsgJzwvZGl2PjxkaXYgY2xhc3M9ImF4aXMiPjxzcGFuPjI5IEp1bjwvc3Bhbj48c3Bhbj40LjIgc2hpcHM8L3NwYW4+PHNwYW4+MzEgQXVnPC9zcGFuPjwvZGl2Pic7Cn0KCmZ1bmN0aW9uIGNhcmQobmFtZSwgaGFuZGxlck5vdGUsIHJvd3MsIHRvbmUsIHN0YW5kaW5nKXsKICBjb25zdCBsYXN0ID0gcm93c1tyb3dzLmxlbmd0aC0xXSwgcHJlID0gcm93c1s1XTsKICBjb25zdCByYXRlID0gbGFzdFswXSA/IE1hdGgucm91bmQobGFzdFsxXS9sYXN0WzBdKjEwMCkgOiAwOwogIHJldHVybiBgPGRpdiBjbGFzcz0iY2FyZCI+CiAgICA8ZGl2IGNsYXNzPSJ0b3AiPjxoMj4ke25hbWV9PC9oMj48c3BhbiBjbGFzcz0id2hvIj4ke2hhbmRsZXJOb3RlfTwvc3Bhbj48L2Rpdj4KICAgIDxkaXYgY2xhc3M9ImJvZHkiPgogICAgICA8ZGl2IGNsYXNzPSJzdGF0Ij48c3Bhbj5PZmZlcnMgdGhpcyB3ZWVrPC9zcGFuPgogICAgICAgIDxzcGFuIGNsYXNzPSIke3RvbmU9PT0naG90Jz8nb2snOidiYWQnfSI+PGI+JHtsYXN0WzBdfTwvYj48L3NwYW4+PC9kaXY+CiAgICAgIDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuPlRha2VuPC9zcGFuPjxzcGFuPiR7bGFzdFsxXX0gKCR7cmF0ZX0lKTwvc3Bhbj48L2Rpdj4KICAgICAgPGRpdiBjbGFzcz0ic3RhdCI+PHNwYW4+V2VlayBiZWZvcmUgNC4yPC9zcGFuPjxzcGFuPiR7cHJlWzBdfSBvZmZlcnMsICR7cHJlWzFdfSB0YWtlbjwvc3Bhbj48L2Rpdj4KICAgICAgJHtzcGFyayhyb3dzLCB0b25lKX0KICAgICAgJHtzdGFuZGluZyB8fCAnJ30KICAgIDwvZGl2PjwvZGl2PmA7Cn0KCmNvbnN0IG5vdGVNaXRlID0gImhhbmRsZXI6IEtpcCDCtyBmbGlnaHQsIHN0cnVjdHVyYWwtZW50cnkiOwpjb25zdCBub3RlR2FsZSA9ICJoYW5kbGVyOiBLaXAgwrcgc3RydWN0dXJhbC1lbnRyeSwgaGF6bWF0LXRvbGVyYW50IjsKCmRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCd0b2RheUNhcmRzJykuaW5uZXJIVE1MID0KICBjYXJkKCJNZXRlb3IgTWl0ZSIsIG5vdGVNaXRlLCBNSVRFLCAnY29sZCcpICsKICBjYXJkKCJUaGUgR2FsZSIsIG5vdGVHYWxlLCBHQUxFLCAnaG90Jyk7Cgpjb25zdCBzdGFuZE1pdGUgPSBgPGRpdiBjbGFzcz0ic3RhbmRpbmcgbG93Ij4KICA8aDM+U3RhbmRpbmcgPHNwYW4gY2xhc3M9InBpbGwgYmFkIj5Mb3cg4oCUIG5vdCByZWNvdmVyaW5nPC9zcGFuPjwvaDM+CiAgPHA+PGI+TWV0ZW9yIE1pdGUgaXMgYmVpbmcgcmFua2VkIGJlbG93IG1vc3QgbmVhcmJ5IHJlc3BvbmRlcnMuPC9iPiBBdmFpbGFibGUgYW5kCiAgICAgcmVhY2hhYmxlLiBOb3QgYmVpbmcgYXNrZWQuPC9wPgogIDxkaXYgY2xhc3M9Im1ldGVyIj48aSBzdHlsZT0id2lkdGg6MTQlO2JhY2tncm91bmQ6dmFyKC0tYmFkKSI+PC9pPjwvZGl2PgoKICA8cCBjbGFzcz0id2h5Ij48Yj5XaHk6PC9iPiBzaW5jZSAxMCBBdWcgd2Ugc2VudCBNZXRlb3IgTWl0ZSAxMSBvZmZlcnMgYW5kIGdvdCAxIHllcy4KICAgICBFYWNoIG5vLWFuc3dlciBsb3dlcmVkIHRoZSByYW5raW5nLCBhbmQgYSBsb3dlciByYW5raW5nIG1lYW5zIGZld2VyIG9mZmVycy4KICAgICA0LjIgbWFkZSBwcm94aW1pdHkgY291bnQgbW9yZSBhbmQgYWNjZXB0YW5jZSBjb3VudCBsZXNzLCBzbyB0aGUgZ2FwIHdpZGVuZWQgZmFzdGVyCiAgICAgdGhhbiBpdCB1c2VkIHRvLjwvcD4KCiAgPHAgY2xhc3M9IndoeSIgc3R5bGU9ImJvcmRlci1sZWZ0OjJweCBzb2xpZCB2YXIoLS1iYWQpO3BhZGRpbmctbGVmdDoxMHB4O21hcmdpbi10b3A6MTBweCI+CiAgICAgPGI+VGhlcmUgaXMgbm8gd2F5IGJhY2sgZnJvbSBoZXJlLjwvYj4gU3RhbmRpbmcgb25seSBnb2VzIHVwIG9uIGFuIGFjY2VwdGVkCiAgICAgb2ZmZXIg4oCUIGFuZCBvZmZlcnMgYXJlIHdoYXQgTWV0ZW9yIE1pdGUgaGFzIHN0b3BwZWQgZ2V0dGluZy4gTm90aGluZyBpbiB0aGUgc3lzdGVtCiAgICAgcmV2ZXJzZXMgdGhpcyBvbiBpdHMgb3duLiBJdCBzdGF5cyBsaWtlIHRoaXMgdW50aWwgc29tZW9uZSBpbnRlcnZlbmVzLjwvcD4KCiAgPHAgY2xhc3M9IndoeSIgc3R5bGU9ImJvcmRlci1sZWZ0OjJweCBzb2xpZCB2YXIoLS1hY2NlbnQpO3BhZGRpbmctbGVmdDoxMHB4O21hcmdpbi10b3A6MTBweCI+CiAgICAgPGI+UHJvcG9zZWQ6PC9iPiBxdWlldCBmb3IgMiBjb25zZWN1dGl2ZSB3ZWVrcywgc28gRGlzcGF0Y2ggc2VuZHMgTWV0ZW9yIE1pdGUgdGhlIG5leHQKICAgICBjYWxsb3V0IGhlIGNhbiBkbyA8Yj5yZWdhcmRsZXNzIG9mIHJhbmtpbmc8L2I+IOKAlCBhIHdheSBiYWNrIHRoYXQgZG9lc24ndCBkZXBlbmQgb24KICAgICBhbiBvZmZlciB0aGF0IGlzbid0IGNvbWluZy48L3A+CgogIDxwIHN0eWxlPSJtYXJnaW46MTJweCAwIDAiPjxidXR0b24gY2xhc3M9InByaW1hcnkiIGRhdGEtbW9kYWw9Imxvb2siPlNjaGVkdWxlIGEgZ3VhcmFudGVlZCBsb29rPC9idXR0b24+CiAgICAgPGJ1dHRvbiBkYXRhLW1vZGFsPSJleHBsYWluIj5XaGF0IGRvZXMgc3RhbmRpbmcgbWVhbj88L2J1dHRvbj48L3A+CiAgPHAgY2xhc3M9IndoeSIgc3R5bGU9Im1hcmdpbi10b3A6OHB4O29wYWNpdHk6Ljc1Ij5DYXZlYXQ6ICJzZW50IiBpcyBhbGwgRGlzcGF0Y2ggYWN0dWFsbHkKICAgICBrbm93cyB0b2RheSDigJQgdGhlcmUncyBubyBkZWxpdmVyeSBjb25maXJtYXRpb24sIHNvIHdlIGNhbid0IHlldCBzYXkgdGhlc2UgMTEgb2ZmZXJzCiAgICAgcmVhY2hlZCB0aGUgcGhvbmUuIFRoYXQgaGFzIHRvIGJlIGZpeGVkIGJlZm9yZSB0aGlzIHdvcmRpbmcgaXMgaG9uZXN0LjwvcD4KPC9kaXY+YDsKCmNvbnN0IHN0YW5kR2FsZSA9IGA8ZGl2IGNsYXNzPSJzdGFuZGluZyI+CiAgPGgzPlN0YW5kaW5nIDxzcGFuIGNsYXNzPSJwaWxsIG9rIj5IaWdoPC9zcGFuPjwvaDM+CiAgPHA+UmFua2VkIGF0IG9yIG5lYXIgdGhlIHRvcCBmb3IgbW9zdCBpbmNpZGVudHMgaW4gdGhpcyBhcmVhLjwvcD4KICA8ZGl2IGNsYXNzPSJtZXRlciI+PGkgc3R5bGU9IndpZHRoOjg2JTtiYWNrZ3JvdW5kOnZhcigtLW9rKSI+PC9pPjwvZGl2PgogIDxwIGNsYXNzPSJ3aHkiPlZvbHVtZSB1cCA2MiUgc2luY2UgNC4yLiBOb3QgYSByZXdhcmQg4oCUIHRoZSByYW5raW5nIGdvdCBtb3JlIGRlY2lzaXZlLAogICAgIGFuZCB3b3JrIHRoYXQgdXNlZCB0byBzcHJlYWQgYWNyb3NzIHRoZSBhcmVhIGlzIGxhbmRpbmcgaGVyZS4KICAgICA8Yj5GbGFnZ2VkIGZvciBsb2FkLjwvYj48L3A+CiAgPHAgc3R5bGU9Im1hcmdpbjoxMnB4IDAgMCI+PGJ1dHRvbiBkYXRhLW1vZGFsPSJjYXAiPkNhcCB3ZWVrbHkgdm9sdW1lPC9idXR0b24+PC9wPgo8L2Rpdj5gOwoKZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Byb3BDYXJkcycpLmlubmVySFRNTCA9CiAgY2FyZCgiTWV0ZW9yIE1pdGUiLCBub3RlTWl0ZSwgTUlURSwgJ2NvbGQnLCBzdGFuZE1pdGUpICsKICBjYXJkKCJUaGUgR2FsZSIsIG5vdGVHYWxlLCBHQUxFLCAnaG90Jywgc3RhbmRHYWxlKTsKCi8qIC0tLS0gTWV0ZW9yIE1pdGUsIHdlZWsgYnkgd2VlayAtLS0tICovCi8qIG9mZmVycy90YWtlbiBhcmUgTWV0ZW9yIE1pdGUncyByZWFsIENTViByb3cuIHN0YW5kaW5nL3JhbmsgYXJlIGlsbHVzdHJhdGl2ZS4gKi8KY29uc3QgTVcgPSBbCiB7czouNjIscmFuazoiNnRoIG9mIDE2IixzdDoiTm9ybWFsIiwKICBub3c6Ik5vdGhpbmcgdW51c3VhbC4gS2lwIGRvZXNuJ3Qgb3BlbiB0aGlzIHBhZ2UuIiwKICBwcm9wOiJTdGFuZGluZyBub3JtYWwuIFJhbmtlZCBtaWQtZmllbGQgZm9yIHRoaXMgYXJlYS4gTm8gYWN0aW9uLiIsCiAgc2F5Tm93OiJOb3RoaW5nIHRvIHNheSDigJQgaXQncyBhIG5vcm1hbCB3ZWVrLiIsCiAgc2F5UHJvcDoiTm90aGluZyB0byBzYXkg4oCUIGFuZCBub3cgdGhlIHNjcmVlbiBjb25maXJtcyB0aGF0LCByYXRoZXIgdGhhbiBLaXAgaW5mZXJyaW5nIGl0LiJ9LAoge3M6LjY2LHJhbms6IjV0aCBvZiAxNiIsc3Q6Ik5vcm1hbCIsCiAgbm93OiJOb3RoaW5nIHVudXN1YWwuIiwKICBwcm9wOiJTdGFuZGluZyBub3JtYWwgYW5kIHN0ZWFkeS4iLAogIHNheU5vdzoiTm90aGluZyB0byBzYXkuIiwgc2F5UHJvcDoiTm90aGluZyB0byBzYXkuIn0sCiB7czouNjAscmFuazoiN3RoIG9mIDE2IixzdDoiTm9ybWFsIiwKICBub3c6IkEgcXVpZXRlciB3ZWVrLiBJbmRpc3Rpbmd1aXNoYWJsZSBmcm9tIG5vaXNlLiIsCiAgcHJvcDoiU3RhbmRpbmcgbm9ybWFsLiBWb2x1bWUgZGlwIGlzIHdpdGhpbiB0aGUgdXN1YWwgcmFuZ2Ug4oCUIG5vdCBmbGFnZ2VkLiIsCiAgc2F5Tm93OiJOb3RoaW5nIHRvIHNheS4iLAogIHNheVByb3A6Ik5vdGhpbmcg4oCUIGFuZCB0aGUgY2FyZCBzYXlzIHNvIGV4cGxpY2l0bHksIHdoaWNoIGlzIHdoYXQgc3RvcHMgS2lwIHdvcnJ5aW5nIGFib3V0IGEgd2VlayB0aGF0IGRvZXNuJ3QgbWF0dGVyLiJ9LAoge3M6LjYyLHJhbms6IjZ0aCBvZiAxNiIsc3Q6Ik5vcm1hbCIsCiAgbm93OiJOb3RoaW5nIHVudXN1YWwuIiwgcHJvcDoiU3RhbmRpbmcgbm9ybWFsLiIsCiAgc2F5Tm93OiJOb3RoaW5nIHRvIHNheS4iLCBzYXlQcm9wOiJOb3RoaW5nIHRvIHNheS4ifSwKIHtzOi42NixyYW5rOiI1dGggb2YgMTYiLHN0OiJOb3JtYWwiLAogIG5vdzoiQSBnb29kIHdlZWsuIiwgcHJvcDoiU3RhbmRpbmcgbm9ybWFsLCB0cmVuZGluZyB1cCBzbGlnaHRseS4iLAogIHNheU5vdzoiTm90aGluZyB0byBzYXkuIiwgc2F5UHJvcDoiTm90aGluZyB0byBzYXkuIn0sCiB7czouNjgscmFuazoiNHRoIG9mIDE2IixzdDoiTm9ybWFsIiwKICBub3c6IkEgZ29vZCB3ZWVrLiBUaGlzIGlzIHRoZSBsYXN0IG9uZS4iLAogIHByb3A6IlN0YW5kaW5nIG5vcm1hbCDigJQgaGlnaGVzdCBvZiB0aGUgc3VtbWVyLiBCYXNlbGluZSBmb3IgZXZlcnl0aGluZyB0aGF0IGZvbGxvd3MuIiwKICBzYXlOb3c6Ik5vdGhpbmcgdG8gc2F5LiIsCiAgc2F5UHJvcDoiTm90aGluZyB0byBzYXkuIFdvcnRoIG5vdGluZyBvbmx5IGluIGhpbmRzaWdodDogdGhpcyBpcyBNZXRlb3IgTWl0ZSdzIGhlYWx0aHkgYmFzZWxpbmUsIGFuZCB0aGUgY2FyZCBub3cgcmVjb3JkcyBpdC4ifSwKIHtzOi40OCxyYW5rOiI3dGggb2YgMTYiLHN0OiJTbGlwcGluZyIsCiAgbm93OiJBY2NlcHRhbmNlIGRyb3BzIHRvIDQwJS4gVGhlIG9mZmVyIGNvdW50IGJhcmVseSBtb3Zlcywgc28gbm90aGluZyBvbiBLaXAncyBzY3JlZW4gY2hhbmdlcyBjb2xvdXIuIiwKICBwcm9wOiI8Yj5TdGFuZGluZyBzbGlwcGluZy48L2I+IDYgdW5hbnN3ZXJlZCBvZmZlcnMgdGhpcyB3ZWVrIGFnYWluc3QgNCB0YWtlbi4gNC4yIHNoaXBwZWQgV2VkbmVzZGF5IGFuZCBub3cgd2VpZ2h0cyBwcm94aW1pdHkgMC42MCAvIGFjY2VwdGFuY2UgMC4yNSDigJQgdW5hbnN3ZXJlZCBvZmZlcnMgY29zdCBtb3JlIHRoYW4gdGhleSBkaWQgbGFzdCB3ZWVrLiIsCiAgc2F5Tm93OiJLaXAgZG9lc24ndCBrbm93IGFueXRoaW5nIGhhcyBoYXBwZW5lZC4gTmVpdGhlciBkb2VzIE1ldGVvciBNaXRlLiIsCiAgc2F5UHJvcDoiXHUyMDFjU29tZXRoaW5nIGNoYW5nZWQgaW4gV2VkbmVzZGF5J3MgcmVsZWFzZSBhbmQgeW91ciByYW5raW5nIGlzIHNsaWRpbmcuIEl0J3MgdGhlIG1pc3NlZCBvbmVzIGRvaW5nIGl0IOKAlCB0aGUgNjAtc2Vjb25kIHdpbmRvdyBpcyBuZXcuXHUyMDFkIEFjdGlvbmFibGUgd2hpbGUgaXQncyBzdGlsbCByZXZlcnNpYmxlLiJ9LAoge3M6LjMwLHJhbms6IjExdGggb2YgMTYiLHN0OiJMb3ciLAogIG5vdzoiT2ZmZXJzIGZhbGwgZnJvbSAxMCB0byA0LiBLaXAgbm90aWNlcywgYmVjYXVzZSBNZXRlb3IgTWl0ZSBzdGFydHMgdGV4dGluZy4iLAogIHByb3A6IjxiPlN0YW5kaW5nIGxvdy48L2I+IFJhbmtlZCBiZWxvdyBtb3N0IG5lYXJieSByZXNwb25kZXJzLiBGaXJzdCB3ZWVrIHVuZGVyIHRocmVzaG9sZCDigJQgb25lIG1vcmUgYW5kIGEgZ3VhcmFudGVlZCBsb29rIGlzIHNjaGVkdWxlZCBhdXRvbWF0aWNhbGx5LiIsCiAgc2F5Tm93OiJcdTIwMWNIYW5nIGluIHRoZXJlLCBpdCdsbCBwaWNrIHVwLlx1MjAxZCBLaXAncyBhY3R1YWwgd29yZHMuIEhlIGhhcyBub3RoaW5nIGJldHRlciwgYW5kIGl0IGlzbid0IHRydWUuIiwKICBzYXlQcm9wOiJcdTIwMWNZb3UndmUgYmVlbiByYW5rZWQgZG93biBzaW5jZSB0aGUgcmVsZWFzZS4gSXQgd29uJ3QgcGljayB1cCBvbiBpdHMgb3duLiBJZiBuZXh0IHdlZWsgaXMgdGhlIHNhbWUsIHRoZSBzeXN0ZW0gc2VuZHMgeW91IG9uZSByZWdhcmRsZXNzIG9mIHJhbmsuXHUyMDFkIn0sCiB7czouMTkscmFuazoiMTN0aCBvZiAxNiIsc3Q6IkxvdyDigJQgbm90IHJlY292ZXJpbmciLAogIG5vdzoiMiBvZmZlcnMsIDAgdGFrZW4uIFN0aWxsIG5vdGhpbmcgb24gc2NyZWVuIHRoYXQgZGlzdGluZ3Vpc2hlcyB0aGlzIGZyb20gYSBxdWlldCBmb3J0bmlnaHQuIiwKICBwcm9wOiI8Yj5TZWNvbmQgY29uc2VjdXRpdmUgd2VlayB1bmRlciB0aHJlc2hvbGQuIEd1YXJhbnRlZWQgbG9vayBzY2hlZHVsZWQuPC9iPiBTdGFuZGluZyBkb2VzIG5vdCByZWNvdmVyIG9uIGl0cyBvd24g4oCUIGl0IG9ubHkgcmlzZXMgb24gYW4gYWNjZXB0ZWQgb2ZmZXIsIGFuZCBvZmZlcnMgaGF2ZSBzdG9wcGVkLiIsCiAgc2F5Tm93OiJcdTIwMWNIYW5nIGluIHRoZXJlXHUyMDFkIGFnYWluLiBNZXRlb3IgTWl0ZSBpcyBub3cgYXNraW5nIHdoZXRoZXIgdGhlIGFwcCBpcyBicm9rZW4uIiwKICBzYXlQcm9wOiJcdTIwMWNUaHVyc2RheSB5b3UgZ2V0IG9uZSBhaGVhZCBvZiB0aGUgcmFua2luZywgd2l0aCA5MCBzZWNvbmRzIGluc3RlYWQgb2YgNjAuIFRoYXQncyB0aGUgd2F5IGJhY2suXHUyMDFkIEEgZGF0ZSwgaW5zdGVhZCBvZiBhIHJlYXNzdXJhbmNlLiJ9LAoge3M6LjE0LHJhbms6IjE0dGggb2YgMTYiLHN0OiJMb3cg4oCUIG5vdCByZWNvdmVyaW5nIiwKICBub3c6IjEgb2ZmZXIuIDAgdGFrZW4uIFRoZSBHYWxlLCBzYW1lIGNpdHksIHNhbWUgd2VlaywgaXMgYXQgMjEgb2ZmZXJzIGFuZCAxNiB0YWtlbi4iLAogIHByb3A6IjxiPlN0YW5kaW5nIGxvdywgbm90IHJlY292ZXJpbmcuPC9iPiAxMSBvZmZlcnMgc2luY2UgMTAgQXVnLCAxIHRha2VuLiBUaGUgdHJhcCBuYW1lZCBvbiB0aGUgY2FyZDogc3RhbmRpbmcgb25seSByaXNlcyBieSBhY2NlcHRpbmcsIGFuZCBhY2NlcHRpbmcgcmVxdWlyZXMgYW4gb2ZmZXIuIiwKICBzYXlOb3c6Ik5vdGhpbmcgaG9uZXN0LiBUaGlzIGlzIHRoZSB3ZWVrIEtpcCBkZXNjcmliZWQgdG8gU29maWEgYXMgXHUyMDFjdHdvIGNhcmRzIHRoYXQgbWlnaHQgYXMgd2VsbCBiZSB0d28gZGlmZmVyZW50IHByb2R1Y3RzLlx1MjAxZCIsCiAgc2F5UHJvcDoiVGhlIGV4cGxhbmF0aW9uLCBwbHVzIGEgc2NoZWR1bGVkIGxvb2suIEtpcCBzdG9wcyBiZWluZyB0aGUgb25seSBwYXJ0IG9mIHRoZSBzeXN0ZW0gdGhhdCBrbm93cyBzb21ldGhpbmcgaXMgd3JvbmcsIGFuZCBoZSBsZWFybmVkIGl0IG9uIDEwIEF1ZyByYXRoZXIgdGhhbiBuZXZlci4ifQpdOwpsZXQgbXcgPSA5OwpmdW5jdGlvbiByZW5kZXJNaXRlKCl7CiAgY29uc3QgZCA9IE1XW213XSwgciA9IE1JVEVbbXddLCByYXRlID0gclswXSA/IE1hdGgucm91bmQoclsxXS9yWzBdKjEwMCkgOiAwOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdtaXRlU3RyaXAnKS5pbm5lckhUTUwgPSBNSVRFLm1hcCgoeCxpKT0+CiAgICBgPGJ1dHRvbiBkYXRhLW13PSIke2l9IiBjbGFzcz0iJHtpPT09bXc/J3NlbCc6Jyd9ICR7aT09PVJFTEVBU0U/J3JlbCc6Jyd9Ij4KICAgICAgIDxzcGFuIGNsYXNzPSJ3ayI+JHtXRUVLU1tpXX08L3NwYW4+PHNwYW4gY2xhc3M9InZvbCI+JHt4WzBdfTwvc3Bhbj48L2J1dHRvbj5gKS5qb2luKCcnKTsKICBjb25zdCBwaWxsID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ21pdGVTdGF0ZVBpbGwnKTsKICBwaWxsLnRleHRDb250ZW50ID0gZC5zdDsKICBwaWxsLmNsYXNzTmFtZSA9ICdwaWxsICcgKyAoZC5zPC4yNT8nYmFkJzpkLnM8LjU1PycnOidvaycpOwoKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbWl0ZU5vdycpLmlubmVySFRNTCA9CiAgICBgPGRpdiBjbGFzcz0ic3RhdCI+PHNwYW4+T2ZmZXJzPC9zcGFuPjxzcGFuIGNsYXNzPSIke3JbMF08NT8nYmFkJzonJ30iPjxiPiR7clswXX08L2I+PC9zcGFuPjwvZGl2PgogICAgIDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuPlRha2VuPC9zcGFuPjxzcGFuPiR7clsxXX0gKCR7cmF0ZX0lKTwvc3Bhbj48L2Rpdj4KICAgICA8ZGl2IGNsYXNzPSJzdGF0Ij48c3Bhbj5TdGFuZGluZzwvc3Bhbj48c3BhbiBjbGFzcz0iZGltIj5ub3Qgc2hvd248L3NwYW4+PC9kaXY+CiAgICAgPGRpdiBjbGFzcz0ic3RhdCI+PHNwYW4+UmVhc29uPC9zcGFuPjxzcGFuIGNsYXNzPSJkaW0iPm5vdCBzaG93bjwvc3Bhbj48L2Rpdj4KICAgICA8cCBjbGFzcz0id2h5IiBzdHlsZT0ibWFyZ2luLXRvcDoxMnB4Ij4ke2Qubm93fTwvcD5gOwoKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbWl0ZVByb3AnKS5pbm5lckhUTUwgPQogICAgYDxkaXYgY2xhc3M9InN0YXQiPjxzcGFuPk9mZmVyczwvc3Bhbj48c3BhbiBjbGFzcz0iJHtyWzBdPDU/J2JhZCc6Jyd9Ij48Yj4ke3JbMF19PC9iPjwvc3Bhbj48L2Rpdj4KICAgICA8ZGl2IGNsYXNzPSJzdGF0Ij48c3Bhbj5UYWtlbjwvc3Bhbj48c3Bhbj4ke3JbMV19ICgke3JhdGV9JSk8L3NwYW4+PC9kaXY+CiAgICAgPGRpdiBjbGFzcz0ic3RhdCI+PHNwYW4+U3RhbmRpbmc8L3NwYW4+PHNwYW4gY2xhc3M9IiR7ZC5zPC4yNT8nYmFkJzpkLnM8LjU1Pyd3YXJuJzonb2snfSI+CiAgICAgICA8Yj4ke2Quc3R9PC9iPjwvc3Bhbj48L2Rpdj4KICAgICA8ZGl2IGNsYXNzPSJzdGF0Ij48c3Bhbj5SYW5rIGZvciB0aGlzIGFyZWE8L3NwYW4+PHNwYW4+JHtkLnJhbmt9PC9zcGFuPjwvZGl2PgogICAgIDxkaXYgY2xhc3M9Im1ldGVyIj48aSBzdHlsZT0id2lkdGg6JHtNYXRoLnJvdW5kKGQucyoxMDApfSU7YmFja2dyb3VuZDp2YXIoJHsKICAgICAgIGQuczwuMjU/Jy0tYmFkJzpkLnM8LjU1PyctLXdhcm4nOictLW9rJ30pIj48L2k+PC9kaXY+CiAgICAgPHAgY2xhc3M9IndoeSIgc3R5bGU9Im1hcmdpbi10b3A6MTJweCI+JHtkLnByb3B9PC9wPmA7CgogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdtaXRlU2F5Tm93JykuaW5uZXJIVE1MID0gZC5zYXlOb3c7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ21pdGVTYXlQcm9wJykuaW5uZXJIVE1MID0gZC5zYXlQcm9wOwoKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbWl0ZVRhYmxlJykuaW5uZXJIVE1MID0KICAgIGA8dHI+PHRoPldlZWs8L3RoPjx0aCBjbGFzcz0ibiI+T2ZmZXJzPC90aD48dGggY2xhc3M9Im4iPlRha2VuPC90aD4KICAgICAgPHRoIGNsYXNzPSJuIj5SYXRlPC90aD48dGg+V291bGQgdGhlIGNvbnNvbGUgaGF2ZSBmbGFnZ2VkIGl0PzwvdGg+PC90cj5gICsKICAgIE1JVEUubWFwKCh4LGkpPT57CiAgICAgIGNvbnN0IHJ0ID0geFswXSA/IE1hdGgucm91bmQoeFsxXS94WzBdKjEwMCkgOiAwOwogICAgICBjb25zdCBmID0gTVdbaV0uczwuMjUgPyAnPHNwYW4gY2xhc3M9InBpbGwgYmFkIj5Mb3cg4oCUIGxvb2sgc2NoZWR1bGVkPC9zcGFuPicKICAgICAgICAgICAgICA6IE1XW2ldLnM8LjU1ID8gJzxzcGFuIGNsYXNzPSJwaWxsIj5TbGlwcGluZzwvc3Bhbj4nCiAgICAgICAgICAgICAgOiAnPHNwYW4gY2xhc3M9ImRpbSI+bm88L3NwYW4+JzsKICAgICAgcmV0dXJuIGA8dHIgY2xhc3M9IiR7aT09PW13PydzZWwnOicnfSAke2k9PT1SRUxFQVNFPydyZWwnOicnfSIgZGF0YS1tdz0iJHtpfSI+CiAgICAgICAgPHRkPiR7V0VFS1NbaV19JHtpPT09UkVMRUFTRT8nIDxzcGFuIGNsYXNzPSJkaW0iPsK3IDQuMiBzaGlwczwvc3Bhbj4nOicnfTwvdGQ+CiAgICAgICAgPHRkIGNsYXNzPSJuIj4ke3hbMF19PC90ZD48dGQgY2xhc3M9Im4iPiR7eFsxXX08L3RkPgogICAgICAgIDx0ZCBjbGFzcz0ibiAke3J0PDQwPydiYWQnOicnfSI+JHtydH0lPC90ZD48dGQ+JHtmfTwvdGQ+PC90cj5gOwogICAgfSkuam9pbignJyk7Cn0KcmVuZGVyTWl0ZSgpOwpkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgndi1taXRlJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCBlPT57CiAgY29uc3QgdCA9IGUudGFyZ2V0LmNsb3Nlc3QoJ1tkYXRhLW13XScpOwogIGlmKHQpeyBtdyA9ICt0LmRhdGFzZXQubXc7IHJlbmRlck1pdGUoKTsgfQp9KTsKCi8qIC0tLS0gRG90IC8gVmVzcGVyIC0tLS0gKi8KY29uc3QgVkVTUEVSID0gW1sxNCwxMV0sWzEzLDEwXSxbMTUsMTNdLFsxNCwxMV0sWzEzLDExXSxbMTQsMTJdLFsxMiw2XSxbNSwxXSxbMiwwXSxbMSwwXV07CmNvbnN0IG5vdGVWZXNwZXIgPSAiaGFuZGxlcjogQXVudCBEb3QgwrcgYXF1YXRpYywgY29sZC13ZWF0aGVyIjsKCmNvbnN0IHN0YW5kVmVzcGVyU21hbGwgPSBgPGRpdiBjbGFzcz0ic3RhbmRpbmcgbG93Ij4KICA8aDM+U3RhbmRpbmcgPHNwYW4gY2xhc3M9InBpbGwgYmFkIj5Mb3cg4oCUIG5vdCByZWNvdmVyaW5nPC9zcGFuPjwvaDM+CiAgPHA+UmFua2VkIGJlbG93IG1vc3QgbmVhcmJ5IHJlc3BvbmRlcnMuIEF2YWlsYWJsZSBhbmQgcmVhY2hhYmxlOyBub3QgYmVpbmcgYXNrZWQuPC9wPgogIDxkaXYgY2xhc3M9Im1ldGVyIj48aSBzdHlsZT0id2lkdGg6MTElO2JhY2tncm91bmQ6dmFyKC0tYmFkKSI+PC9pPjwvZGl2PgogIDxwIGNsYXNzPSJ3aHkiPlNpbmNlIDEwIEF1ZywgOCBvZmZlcnMgYW5kIDEgeWVzLiBFYWNoIG5vLWFuc3dlciBsb3dlcmVkIGhpcyByYW5raW5nIGFuZCBhCiAgICAgbG93ZXIgcmFua2luZyBtZWFucyBmZXdlciBvZmZlcnMuIFN0YW5kaW5nIG9ubHkgcmlzZXMgYnkgYWNjZXB0aW5nIG9uZSwgc28gdGhpcyBkb2VzIG5vdAogICAgIHJldmVyc2Ugb24gaXRzIG93bi48L3A+CjwvZGl2PmA7Cgpjb25zdCBzdGFuZFZlc3BlckJpZyA9IGA8ZGl2IGNsYXNzPSJzdGFuZGluZyBsb3ciPgogIDxwIGNsYXNzPSJnbGFuY2UiPkl0J3MgcXVpZXQgYmVjYXVzZSBoZSdzIGJlZW4gcmFua2VkIGRvd24g4oCUIG5vdCBiZWNhdXNlIG5vdGhpbmcncwogICAgIGhhcHBlbmluZy48L3A+CiAgPGRpdiBjbGFzcz0ibWV0ZXIiPjxpIHN0eWxlPSJ3aWR0aDoxMSU7YmFja2dyb3VuZDp2YXIoLS1iYWQpIj48L2k+PC9kaXY+CiAgPHAgY2xhc3M9IndoeSI+OCBvZmZlcnMgc2luY2UgMTAgQXVnLCAxIHRha2VuLiBJdCB3b24ndCBwaWNrIHVwIG9uIGl0cyBvd24uPC9wPgogIDxwIGNsYXNzPSJ3aHkiIHN0eWxlPSJib3JkZXItbGVmdDoycHggc29saWQgdmFyKC0tYWNjZW50KTtwYWRkaW5nLWxlZnQ6MTBweDttYXJnaW4tdG9wOjEwcHgiPgogICAgIDxiPk5leHQgZ3VhcmFudGVlZCBsb29rOiBUaHVyc2RheS48L2I+IEhlIGdldHMgdGhlIG5leHQgc3VpdGFibGUgY2FsbG91dCBhaGVhZCBvZiB0aGUKICAgICByYW5raW5nLCB3aXRoIDkwIHNlY29uZHMgdG8gYW5zd2VyLjwvcD4KICA8cCBjbGFzcz0id2h5IiBzdHlsZT0ibWFyZ2luLXRvcDoxMHB4Ij5Zb3UnbGwgZ2V0IHRoZSBhbGVydCB0b28sIG9uIHRoaXMgbGFwdG9wIOKAlCBub3QganVzdAogICAgIGhpcyBwaG9uZS48L3A+CjwvZGl2PmA7Cgpkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZG90U21hbGwnKS5pbm5lckhUTUwgPQogIGNhcmQoIlZlc3BlciIsIG5vdGVWZXNwZXIsIFZFU1BFUiwgJ2NvbGQnLCBzdGFuZFZlc3BlclNtYWxsKTsKZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2RvdEJpZycpLmlubmVySFRNTCA9CiAgY2FyZCgiVmVzcGVyIiwgbm90ZVZlc3BlciwgVkVTUEVSLCAnY29sZCcsIHN0YW5kVmVzcGVyQmlnKTsKCi8qIC0tLS0gcmVjb3Zlcnkgd2Fsa3Rocm91Z2ggLS0tLSAqLwpjb25zdCBTVEVQUyA9IFsKICB7dzoiV2VlayBvZiAzMSBBdWciLCAgczowLjE0LCByYW5rOiIxNHRoIG9mIDE2Iiwgb2ZmZXJzOjEsIHNlbGY6Ik5vIiwKICAgbG9nOltbIjMxIEF1ZyIsIjEgb2ZmZXIgYWxsIHdlZWsuIFVuYW5zd2VyZWQg4oCUIGhlIHdhcyAzNCBtaW4gb3V0IGFuZCBpdCB3ZW50IHRvIHNvbWVvbmUgY2xvc2VyLiIsImxvc3MiXSwKICAgICAgICBbIiIsIlN0YW5kaW5nIHVuY2hhbmdlZCBhdCBmbG9vci1hZGphY2VudC4gTm90aGluZyBpbiB0aGUgc3lzdGVtIG1vdmVzIGl0IGJhY2suIiwibG9zcyJdXX0sCiAge3c6IldlZWsgb2YgNyBTZXB0IOKAlCBmbGFnZ2VkIiwgczowLjE0LCByYW5rOiIxNHRoIG9mIDE2Iiwgb2ZmZXJzOjEsIHNlbGY6Ik5vIiwKICAgbG9nOltbIjcgU2VwdCIsIlNlY29uZCBjb25zZWN1dGl2ZSB3ZWVrIHVuZGVyIHRocmVzaG9sZC4gPGI+RmxhZ2dlZCBmb3IgYSBndWFyYW50ZWVkIGxvb2suPC9iPiIsImdhaW4iXSwKICAgICAgICBbIiIsIktpcCdzIGNhcmQgdXBkYXRlcy4gTWl0ZSdzIHBob25lIHNob3dzIHRoZSBzdGFuZGluZyBjYXJkIGFuZCB3aGVuIHRoZSBsb29rIGxhbmRzLiIsImdhaW4iXV19LAogIHt3OiJXZWVrIG9mIDcgU2VwdCDigJQgdGhlIGxvb2siLCBzOjAuMjIsIHJhbms6IjExdGggb2YgMTYiLCBvZmZlcnM6Miwgc2VsZjoi4oCUIiwKICAgbG9nOltbIjkgU2VwdCIsIkd1YXJhbnRlZWQgbG9vayByb3V0ZXMgdG8gTWl0ZSBmaXJzdCwgYWhlYWQgb2YgdHdvIGNsb3NlciByZXNwb25kZXJzLiIsImdhaW4iXSwKICAgICAgICBbIiIsIjxiPjkwLXNlY29uZCB3aW5kb3c8L2I+IGluc3RlYWQgb2YgNjAuIEFuc3dlcmVkIGF0IDcxcyDigJQgd291bGQgaGF2ZSBiZWVuIGEgbWlzcyB0b2RheS4iLCJnYWluIl0sCiAgICAgICAgWyIiLCIrMC4wOCBjcmVkaXQuIEZpcnN0IHVwd2FyZCBtb3ZlIHNpbmNlIDEwIEF1Z3VzdC4iLCJnYWluIl1dfSwKICB7dzoiV2VlayBvZiAxNCBTZXB0IiwgczowLjM4LCByYW5rOiI4dGggb2YgMTYiLCBvZmZlcnM6NSwgc2VsZjoiWWVzIiwKICAgbG9nOltbIjE0IFNlcHQiLCJCYWNrIGluIG5vcm1hbCByYW5raW5nIHJhbmdlLiA1IG9mZmVycyBhcnJpdmUgd2l0aG91dCBpbnRlcnZlbnRpb24uIiwiZ2FpbiJdLAogICAgICAgIFsiIiwiMiB0YWtlbiwgMSBkZWNsaW5lZCAoZ2VudWluZWx5IHVuYXZhaWxhYmxlKSwgMiB1bmFuc3dlcmVkLiIsIiIgXSwKICAgICAgICBbIiIsIk5ldCB1cC4gU2Vjb25kIGd1YXJhbnRlZWQgbG9vayBub3QgbmVlZGVkIOKAlCB3aXRoZHJhd24gYXV0b21hdGljYWxseS4iLCJnYWluIl1dfSwKICB7dzoiV2VlayBvZiAyMSBTZXB0IiwgczowLjUwLCByYW5rOiI2dGggb2YgMTYiLCBvZmZlcnM6OSwgc2VsZjoiWWVzIiwKICAgbG9nOltbIjIxIFNlcHQiLCJCYWNrIHRvIG5ldXRyYWwsIG9uIGhpcyBvd24gbWVyaXRzLiBWb2x1bWUgY2xvc2UgdG8gaGlzIEp1bHkgYmFzZWxpbmUuIiwiZ2FpbiJdLAogICAgICAgIFsiIiwiS2lwJ3MgdHdvIGNhcmRzIHRlbGwgdGhlIHNhbWUgc3RvcnkgYWdhaW4uIiwiZ2FpbiJdLAogICAgICAgIFsiIiwiVGhlIEdhbGUgZHJvcHMgdG8gMTUgb2ZmZXJzIOKAlCB0aGUgbG9hZCBmbGFnIGFsc28gcmVzb2x2ZXMuIiwiZ2FpbiJdXX0KXTsKbGV0IHN0ZXAgPSAwOwpmdW5jdGlvbiByZW5kZXJSZWMoKXsKICBjb25zdCBzID0gU1RFUFNbc3RlcF07CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3JlY1dlZWsnKS50ZXh0Q29udGVudCA9IHMudzsKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgncmVjU2NvcmUnKS50ZXh0Q29udGVudCA9IHMucy50b0ZpeGVkKDIpOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZWNSYW5rJykudGV4dENvbnRlbnQgPSBzLnJhbms7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3JlY09mZmVycycpLnRleHRDb250ZW50ID0gcy5vZmZlcnM7CiAgY29uc3Qgc2VsZiA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZWNTZWxmJyk7CiAgc2VsZi50ZXh0Q29udGVudCA9IHMuc2VsZjsKICBzZWxmLmNsYXNzTmFtZSA9IHMuc2VsZiA9PT0gIlllcyIgPyAib2siIDogKHMuc2VsZiA9PT0gIk5vIiA/ICJiYWQiIDogIndhcm4iKTsKICBjb25zdCBiYXIgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgncmVjQmFyJyk7CiAgYmFyLnN0eWxlLndpZHRoID0gTWF0aC5yb3VuZChzLnMqMTAwKSArICIlIjsKICBiYXIuc3R5bGUuYmFja2dyb3VuZCA9IHMucyA8IC4yNSA/ICJ2YXIoLS1iYWQpIiA6IHMucyA8IC40NSA/ICJ2YXIoLS13YXJuKSIgOiAidmFyKC0tb2spIjsKICBjb25zdCBwaWxsID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3JlY1BpbGwnKTsKICBwaWxsLnRleHRDb250ZW50ID0gcy5zIDwgLjI1ID8gIkxvdyIgOiBzLnMgPCAuNDUgPyAiUmVjb3ZlcmluZyIgOiAiTm9ybWFsIjsKICBwaWxsLmNsYXNzTmFtZSA9ICJwaWxsICIgKyAocy5zIDwgLjI1ID8gImJhZCIgOiBzLnMgPCAuNDUgPyAiIiA6ICJvayIpOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZWNMb2cnKS5pbm5lckhUTUwgPSBTVEVQUy5zbGljZSgwLCBzdGVwKzEpLmZsYXRNYXAoeD0+eC5sb2cpCiAgICAubWFwKChbdyx0LGNdKT0+YDxkaXYgY2xhc3M9ImV2ICR7Y3x8Jyd9Ij48c3BhbiBjbGFzcz0idyI+JHt3fTwvc3Bhbj48c3Bhbj4ke3R9PC9zcGFuPjwvZGl2PmApLmpvaW4oJycpOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZWNCYWNrJykuZGlzYWJsZWQgPSBzdGVwID09PSAwOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZWNGd2QnKS5kaXNhYmxlZCA9IHN0ZXAgPT09IFNURVBTLmxlbmd0aC0xOwp9CmRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZWNGd2QnKS5vbmNsaWNrICA9ICgpPT57IGlmKHN0ZXA8U1RFUFMubGVuZ3RoLTEpe3N0ZXArKztyZW5kZXJSZWMoKTt9IH07CmRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZWNCYWNrJykub25jbGljayA9ICgpPT57IGlmKHN0ZXA+MCl7c3RlcC0tO3JlbmRlclJlYygpO30gfTsKZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3JlY1Jlc2V0Jykub25jbGljaz0gKCk9Pnsgc3RlcD0wO3JlbmRlclJlYygpOyB9OwpyZW5kZXJSZWMoKTsKCi8qIC0tLS0gY2FwIHJlZGlzdHJpYnV0aW9uIC0tLS0gKi8KY29uc3QgQ0FQUyA9IFsyMSwxOCwxNSwxMl07CmxldCBjYXAgPSAxNTsKZnVuY3Rpb24gcmVuZGVyQ2FwKCl7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NhcEJ0bnMnKS5pbm5lckhUTUwgPSBDQVBTLm1hcChjPT4KICAgIGA8YnV0dG9uIGNsYXNzPSIke2M9PT1jYXA/J3NlbCc6Jyd9IiBkYXRhLWNhcD0iJHtjfSI+JHtjPT09MjE/J05vIGNhcCAoMjEpJzpjKycgLyB3ZWVrJ308L2J1dHRvbj5gCiAgKS5qb2luKCcnKTsKICBjb25zdCBvdmVyID0gMjEgLSBjYXA7CiAgY29uc3Qgb3V0ID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NhcE91dCcpOwogIGlmKCFvdmVyKXsKICAgIG91dC5pbm5lckhUTUwgPSBgPHAgY2xhc3M9IndoeSI+Tm8gY2FwIOKAlCBUaGUgR2FsZSBrZWVwcyBhbGwgMjEuIEtpcCdzIHR3byBjYXJkcyBzdGF5IGFzCiAgICAgIGZhciBhcGFydCBhcyB0aGV5IGFyZSBub3cuPC9wPmA7CiAgfSBlbHNlIHsKICAgIC8vIG92ZXJmbG93IGNhc2NhZGVzIHRvIHRoZSBuZXh0LXJhbmtlZCByZXNwb25kZXJzLCB3aG8gYXJlIGFsc28gaGlnaC1zdGFuZGluZwogICAgY29uc3Qgc2hhcmUgPSBbWyJTZ3QuIEZhbGtpcmsiLC4zNF0sWyJTdG9ybXdyYWNrIiwuM10sWyJDYXB0YWluIFZhbnRhZ2UiLC4yMl0sWyJOaWdodHdlbGwiLC4xNF1dOwogICAgbGV0IGxlZnQgPSBvdmVyLCByb3dzID0gc2hhcmUubWFwKChbbixmXSxpKT0+ewogICAgICBjb25zdCB2ID0gaT09PXNoYXJlLmxlbmd0aC0xID8gbGVmdCA6IE1hdGgubWF4KDEsIE1hdGgucm91bmQob3ZlcipmKSk7CiAgICAgIGxlZnQgLT0gdjsgcmV0dXJuIFtuLCBNYXRoLm1heCgwLHYpXTsKICAgIH0pLmZpbHRlcihyPT5yWzFdPjApOwogICAgb3V0LmlubmVySFRNTCA9IGA8dGFibGU+PHRyPjx0aD5SZXNwb25kZXI8L3RoPjx0aD5DdXJyZW50IHN0YW5kaW5nPC90aD4KICAgICAgPHRoIGNsYXNzPSJuIj5FeHRyYSBjYWxsb3V0czwvdGg+PC90cj5gICsKICAgICAgcm93cy5tYXAoKFtuLHZdKT0+YDx0cj48dGQ+JHtufTwvdGQ+PHRkPjxzcGFuIGNsYXNzPSJwaWxsIG9rIj5IaWdoPC9zcGFuPjwvdGQ+CiAgICAgICAgPHRkIGNsYXNzPSJuIG9rIj4rJHt2fTwvdGQ+PC90cj5gKS5qb2luKCcnKSArCiAgICAgIGA8dHIgY2xhc3M9Im5vdyI+PHRkPjxiPk1ldGVvciBNaXRlPC9iPjwvdGQ+PHRkPjxzcGFuIGNsYXNzPSJwaWxsIGJhZCI+TG93PC9zcGFuPjwvdGQ+CiAgICAgICAgPHRkIGNsYXNzPSJuIGJhZCI+PGI+KzA8L2I+PC90ZD48L3RyPjwvdGFibGU+CiAgICAgIDxwIGNsYXNzPSJ3aHkiIHN0eWxlPSJtYXJnaW4tdG9wOjEwcHgiPjxiPkNhcHBpbmcgdGhlIGJ1c2llc3QgcmVzcG9uZGVyIGRvZXMgbm90IGZlZWQKICAgICAgICB0aGUgcXVpZXRlc3Qgb25lLjwvYj4gVGhlICR7b3Zlcn0gY2FsbG91dHMgY2FzY2FkZSB0byB3aG9ldmVyIGlzIG5leHQgaW4gdGhlIHJhbmtpbmcg4oCUCiAgICAgICAgYW5kIE1ldGVvciBNaXRlIGlzIDE0dGggb2YgMTYg4oCUIHRvbyBmYXIgZG93biB0byBjYXRjaCB0aGUgb3ZlcmZsb3cgbm8gbWF0dGVyIGhvdwogICAgICAgIGhhcmQgS2lwIHRocm90dGxlcyBUaGUgR2FsZS48L3A+YDsKICB9CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NhcE5vdGUnKS5pbm5lckhUTUwgPSBgCiAgICA8cD48Yj5UaGlzIGlzIHRoZSBzY3JlZW4gdGhhdCBhcmd1ZXMgYWdhaW5zdCBpdHNlbGYuPC9iPiBLaXAncyBpbnN0aW5jdCDigJQgYW5kIG1pbmUgd2hlbiBJCiAgICAgICBwdXQgdGhpcyBidXR0b24gb24gdGhlIG1vY2sg4oCUIGlzIHRoYXQgcmVsaWV2aW5nIFRoZSBHYWxlIGhlbHBzIE1ldGVvciBNaXRlLiBJdCBkb2Vzbid0LgogICAgICAgT25seSBzb21ldGhpbmcgdGhhdCBvdmVycmlkZXMgcmFua2luZyBkb2VzLCB3aGljaCBpcyB0aGUgZ3VhcmFudGVlZCBsb29rLiBUaGUgY2FwCiAgICAgICB0cmVhdHMgdGhlIHN5bXB0b20gb24gb25lIGNhcmQgYW5kIGNoYW5nZXMgbm90aGluZyBvbiB0aGUgb3RoZXIuPC9wPgogICAgPHA+PGI+T3BlbiDigJQgYSBjYXAgaXMgYSBjb3ZlcmFnZSBwcm9taXNlIERpc3BhdGNoIGNhbid0IGtlZXAgYWxvbmUuPC9iPiBJZiB0aGUgY2FzY2FkZQogICAgICAgcnVucyBvdXQgb2YgaGlnaC1zdGFuZGluZyByZXNwb25kZXJzIGluIHJhbmdlLCB0aGUgY2FsbG91dCBnb2VzIHVuZmlsbGVkLiBOb3RoaW5nIGhlcmUKICAgICAgIG1vZGVscyB0aGF0LjwvcD4KICAgIDxwPjxiPk9wZW4g4oCUIHdob3NlIGRlY2lzaW9uIGlzIGl0PzwvYj4gS2lwIG1hbmFnZXMgYXZhaWxhYmlsaXR5LCBidXQgVGhlIEdhbGUgaXMgdGhlIG9uZQogICAgICAgd2hvJ3MgdGlyZWQuICJFeGhhdXN0ZWQiIGlzIEtpcCdzIHdvcmQgaW4gYSBVWCBpbnRlcnZpZXc7IHdlIGhvbGQgbm8gZmF0aWd1ZSBkYXRhIGF0CiAgICAgICBhbGwuPC9wPmA7Cn0KcmVuZGVyQ2FwKCk7CmRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjYXBCdG5zJykub25jbGljayA9IGU9PnsKICBjb25zdCBjID0gZS50YXJnZXQuZGF0YXNldC5jYXA7IGlmKGMpeyBjYXAgPSArYzsgcmVuZGVyQ2FwKCk7IH0KfTsKCi8qIC0tLS0gbW9kYWxzIC0tLS0gKi8KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCBlPT57CiAgY29uc3Qgb3BlbiA9IGUudGFyZ2V0LmNsb3Nlc3QoJ1tkYXRhLW1vZGFsXScpOwogIGlmKG9wZW4peyBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbS0nK29wZW4uZGF0YXNldC5tb2RhbCkuY2xhc3NMaXN0LmFkZCgnb24nKTsgcmV0dXJuOyB9CiAgaWYoZS50YXJnZXQuY2xvc2VzdCgnW2RhdGEtY2xvc2VdJykgfHwgZS50YXJnZXQuY2xhc3NMaXN0LmNvbnRhaW5zKCdvdmVybGF5JykpewogICAgZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnLm92ZXJsYXknKS5mb3JFYWNoKG89Pm8uY2xhc3NMaXN0LnJlbW92ZSgnb24nKSk7CiAgfQp9KTsKZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigna2V5ZG93bicsIGU9PnsKICBpZihlLmtleT09PSdFc2NhcGUnKSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCcub3ZlcmxheScpLmZvckVhY2gobz0+by5jbGFzc0xpc3QucmVtb3ZlKCdvbicpKTsKfSk7CgovKiAtLS0tIG5hdiArIHRoZW1lIC0tLS0gKi8KZG9jdW1lbnQucXVlcnlTZWxlY3RvckFsbCgnbmF2IGJ1dHRvbicpLmZvckVhY2goYj0+ewogIGIub25jbGljayA9ICgpPT57CiAgICBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCduYXYgYnV0dG9uJykuZm9yRWFjaCh4PT54LmNsYXNzTGlzdC50b2dnbGUoJ29uJywgeD09PWIpKTsKICAgIFsndG9kYXknLCdwcm9wb3NlZCcsJ21pdGUnLCdwaG9uZScsJ3JlY292ZXInLCdkb3QnLCd1bmtub3duJ10uZm9yRWFjaCh2PT57CiAgICAgIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCd2LScrdikuaGlkZGVuID0gKHYgIT09IGIuZGF0YXNldC52KTsKICAgIH0pOwogICAgd2luZG93LnNjcm9sbFRvKDAsMCk7CiAgfTsKfSk7CmNvbnN0IHQgPSBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgndGhlbWUnKTsKdC5vbmNsaWNrID0gKCk9PnsKICBjb25zdCBsaWdodCA9IGRvY3VtZW50LmRvY3VtZW50RWxlbWVudC5nZXRBdHRyaWJ1dGUoJ2RhdGEtdGhlbWUnKSA9PT0gJ2xpZ2h0JzsKICBkb2N1bWVudC5kb2N1bWVudEVsZW1lbnQuc2V0QXR0cmlidXRlKCdkYXRhLXRoZW1lJywgbGlnaHQgPyAnZGFyaycgOiAnbGlnaHQnKTsKICB0LnRleHRDb250ZW50ID0gbGlnaHQgPyAnTGlnaHQnIDogJ0RhcmsnOwp9Owo8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+Cg==</script>
+
 <script>
 (function(){
-  "use strict";
+"use strict";
 
-  /* ---------- data ---------- */
-  var weeks = ["29 Jun","6 Jul","13 Jul","20 Jul","27 Jul","3 Aug","10 Aug","17 Aug","24 Aug","31 Aug"];
-  var rate  = [76.7,77.1,76.4,75.0,77.6,77.9,54.2,65.8,66.7,72.7];
+/* ---------- reveal ---------- */
+var obs = new IntersectionObserver(function(es){
+  es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); obs.unobserve(e.target); } });
+}, {threshold:.12});
+Array.prototype.forEach.call(document.querySelectorAll(".reveal"), function(el){ obs.observe(el); });
 
+/* ---------- progress + dots ---------- */
+var secs = Array.prototype.slice.call(document.querySelectorAll("section"));
+var dots = document.getElementById("dots");
+secs.forEach(function(s,i){
+  var a=document.createElement("a"); a.href="#"+s.id; a.setAttribute("aria-label","Slide "+(i+1)); dots.appendChild(a);
+});
+var dotEls = Array.prototype.slice.call(dots.children);
+var prog = document.getElementById("progress");
+function onScroll(){
+  var h = document.documentElement.scrollHeight - window.innerHeight;
+  prog.style.width = (h>0 ? (window.scrollY/h*100) : 0) + "%";
+  var mid = window.scrollY + window.innerHeight/2, cur = 0;
+  secs.forEach(function(s,i){ if(s.offsetTop <= mid) cur = i; });
+  dotEls.forEach(function(d,i){ d.classList.toggle("on", i===cur); });
+}
+window.addEventListener("scroll", onScroll, {passive:true});
+window.addEventListener("resize", onScroll);
+onScroll();
+
+/* ---------- chart helpers ---------- */
+var NS = "http://www.w3.org/2000/svg";
+function el(n,a){ var e=document.createElementNS(NS,n); for(var k in a) e.setAttribute(k,a[k]); return e; }
+function trace(path){ var L=path.getTotalLength(); path.style.setProperty("--len",L); path.classList.add("trace"); }
+
+var WEEKS = ["29 Jun","6 Jul","13 Jul","20 Jul","27 Jul","3 Aug","10 Aug","17 Aug","24 Aug","31 Aug"];
+
+/* ---------- chart 1: acceptance rate ---------- */
+(function(){
+  var svg = document.getElementById("c1");
+  var data = [76.7,77.1,76.4,75.0,77.6,77.9,54.2,65.8,66.7,72.7];
+  var W=900,H=300,L=52,R=26,T=22,B=42, pw=W-L-R, ph=H-T-B;
+  var lo=45, hi=85;
+  function x(i){ return L + i*(pw/(data.length-1)); }
+  function y(v){ return T + ph - (v-lo)/(hi-lo)*ph; }
+
+  [50,60,70,80].forEach(function(g){
+    svg.appendChild(el("line",{x1:L,x2:L+pw,y1:y(g),y2:y(g),stroke:"#232b3d","stroke-width":1}));
+    var t=el("text",{x:L-10,y:y(g)+4,"text-anchor":"end"}); t.textContent=g+"%"; svg.appendChild(t);
+  });
+
+  /* release band */
+  svg.appendChild(el("rect",{x:x(6)-((pw/9)/2),y:T,width:pw/9,height:ph,fill:"#ff6b7a",opacity:".07"}));
+  svg.appendChild(el("line",{x1:x(6),x2:x(6),y1:T,y2:T+ph,stroke:"#ff6b7a","stroke-width":1.5,"stroke-dasharray":"4 4",opacity:".75"}));
+  var rl=el("text",{x:x(6)+8,y:T+14,fill:"#ff6b7a"}); rl.textContent="4.2 ships"; svg.appendChild(rl);
+
+  var d=data.map(function(v,i){ return (i?"L":"M")+x(i)+" "+y(v); }).join(" ");
+  var area = el("path",{d:d+" L"+x(data.length-1)+" "+(T+ph)+" L"+x(0)+" "+(T+ph)+" Z",fill:"url(#g1)",opacity:".18"});
+  var defs=el("defs"), lg=el("linearGradient",{id:"g1",x1:"0",y1:"0",x2:"0",y2:"1"});
+  lg.appendChild(el("stop",{offset:"0%","stop-color":"#5fd3c4"}));
+  lg.appendChild(el("stop",{offset:"100%","stop-color":"#5fd3c4","stop-opacity":"0"}));
+  defs.appendChild(lg); svg.appendChild(defs); svg.appendChild(area);
+
+  var p = el("path",{d:d,fill:"none",stroke:"#5fd3c4","stroke-width":2.6,"stroke-linejoin":"round","stroke-linecap":"round"});
+  svg.appendChild(p); trace(p);
+
+  data.forEach(function(v,i){
+    var c = (i===6) ? "#ff6b7a" : (i>6 ? "#7ee08f" : "#5fd3c4");
+    svg.appendChild(el("circle",{cx:x(i),cy:y(v),r:(i===6?5:3.5),fill:c}));
+    if(i===0||i===6||i===9){
+      var t=el("text",{x:x(i),y:y(v)-13,"text-anchor":"middle",fill:c});
+      t.setAttribute("class","lbl"); t.textContent=Math.round(v)+"%"; svg.appendChild(t);
+    }
+    if(i%2===0||i===9){
+      var w=el("text",{x:x(i),y:H-16,"text-anchor":"middle"}); w.textContent=WEEKS[i]; svg.appendChild(w);
+    }
+  });
+})();
+
+/* ---------- chart 2: per-responder volume ---------- */
+(function(){
+  var svg = document.getElementById("c2");
   var series = [
-    {n:"The Gale",        v:[13,12,13,14,13,13,15,17,20,21], g:"win"},
-    {n:"Nightwell",       v:[15,14,15,16,15,15,16,18,20,21], g:"win"},
-    {n:"Stormwrack",      v:[13,13,12,14,13,13,14,16,18,19], g:"win"},
-    {n:"Captain Vantage", v:[12,13,12,11,12,12,13,15,17,18], g:"win"},
-    {n:"Sgt. Falkirk",    v:[10,10,11,10, 9,10,11,13,15,16], g:"win"},
-    {n:"Cindermark",      v:[ 9, 9, 8,10, 9, 9,10,11,12,12], g:"mid"},
-    {n:"Ironvale",        v:[ 8, 8, 9, 8, 7, 8, 9,10,11,12], g:"mid"},
-    {n:"Sgt. Bulwark",    v:[ 9, 9,10, 9, 8, 9,10,10,11,11], g:"mid"},
-    {n:"Halfmoon",        v:[11,10,11,12,11,11,11, 9, 8, 8], g:"mid"},
-    {n:"The Drift",       v:[ 6, 6, 7, 6, 6, 6, 7, 7, 8, 8], g:"mid"},
-    {n:"The Longcast",    v:[ 7, 7, 8, 7, 7, 7, 8, 8, 9, 9], g:"mid"},
-    {n:"Cpl. Ashgrove",   v:[10,11,10, 9,10,10,10, 8, 7, 7], g:"mid"},
-    {n:"Vesper",          v:[14,13,15,14,13,14,12, 5, 2, 1], g:"lose"},
-    {n:"The Undertow",    v:[12,11,12,13,12,12,11, 4, 1, 0], g:"lose"},
-    {n:"Farlight",        v:[12,12,11,12,13,12,10, 3, 1, 0], g:"lose"},
-    {n:"Meteor Mite",     v:[11,12,10,11,12,11,10, 4, 2, 1], g:"lose"}
+    {n:"Nightwell",   v:[15,14,15,16,15,15,16,18,20,21], c:"#7ee08f"},
+    {n:"The Gale",    v:[13,12,13,14,13,13,15,17,20,21], c:"#7ee08f"},
+    {n:"Stormwrack",  v:[13,13,12,14,13,13,14,16,18,19], c:"#6fd3a0"},
+    {n:"Capt. Vantage",v:[12,13,12,11,12,12,13,15,17,18], c:"#6fd3a0"},
+    {n:"Sgt. Falkirk",v:[10,10,11,10,9,10,11,13,15,16], c:"#6fd3a0"},
+    {n:"Vesper",      v:[14,13,15,14,13,14,12,5,2,1],   c:"#ff6b7a"},
+    {n:"Meteor Mite", v:[11,12,10,11,12,11,10,4,2,1],   c:"#ff6b7a"},
+    {n:"Farlight",    v:[12,12,11,12,13,12,10,3,1,0],   c:"#ff8a7a"},
+    {n:"The Undertow",v:[12,11,12,13,12,12,11,4,1,0],   c:"#ff8a7a"}
   ];
+  var W=900,H=380,L=40,R=132,T=20,B=40, pw=W-L-R, ph=H-T-B, hi=22;
+  function x(i){ return L + i*(pw/9); }
+  function y(v){ return T + ph - (v/hi)*ph; }
 
-  var NS = "http://www.w3.org/2000/svg";
-  function el(t,a){var e=document.createElementNS(NS,t);for(var k in a){if(a[k]!==null&&a[k]!==undefined)e.setAttribute(k,a[k]);}return e;}
-  function txt(x,y,s,cls,anchor){var t=el("text",{x:x,y:y,"class":cls||"ax","text-anchor":anchor||"middle"});t.textContent=s;return t;}
-  function path(pts){return pts.map(function(p,i){return (i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1);}).join(" ");}
-
-  /* ---------- chart 1: acceptance rate ---------- */
-  (function(){
-    var g=document.getElementById("c1");
-    var W=980,H=340,L=56,R=24,T=22,B=42;
-    var pw=W-L-R, ph=H-T-B;
-    var yMin=45, yMax=85;
-    var X=function(i){return L+(pw*i)/(weeks.length-1);};
-    var Y=function(v){return T+ph-((v-yMin)/(yMax-yMin))*ph;};
-
-    for(var v=50;v<=85;v+=5){
-      g.appendChild(el("line",{x1:L,y1:Y(v),x2:W-R,y2:Y(v),"class":"gl"}));
-      g.appendChild(txt(L-12,Y(v)+4,v+"%","ax","end"));
-    }
-    weeks.forEach(function(w,i){ g.appendChild(txt(X(i),H-14,w)); });
-
-    /* pre-release stable band */
-    g.appendChild(el("rect",{x:L,y:Y(78.5),width:X(5)-L,height:Y(74.5)-Y(78.5),fill:"#5fd3c4","fill-opacity":".07",rx:3}));
-    g.appendChild(txt((L+X(5))/2,Y(78.5)-10,"stable · 76–78% for six weeks","ax"));
-
-    /* release marker */
-    var rx=(X(5)+X(6))/2;
-    g.appendChild(el("line",{x1:rx,y1:T-6,x2:rx,y2:T+ph,stroke:"#ff6b7a","stroke-width":1.5,"stroke-dasharray":"5 5"}));
-    var rl=txt(rx+8,T+6,"4.2 ships","ax","start"); rl.setAttribute("fill","#ff6b7a"); g.appendChild(rl);
-
-    var pts=rate.map(function(v,i){return [X(i),Y(v)];});
-
-    /* area */
-    var area=el("path",{d:path(pts)+" L"+X(9)+" "+(T+ph)+" L"+L+" "+(T+ph)+" Z",fill:"url(#grad1)","class":"dotfade"});
-    var defs=el("defs");
-    var lg=el("linearGradient",{id:"grad1",x1:"0",y1:"0",x2:"0",y2:"1"});
-    lg.appendChild(el("stop",{offset:"0%","stop-color":"#5fd3c4","stop-opacity":".26"}));
-    lg.appendChild(el("stop",{offset:"100%","stop-color":"#5fd3c4","stop-opacity":"0"}));
-    defs.appendChild(lg); g.appendChild(defs); g.appendChild(area);
-
-    var line=el("path",{d:path(pts),fill:"none",stroke:"#5fd3c4","stroke-width":3,"stroke-linecap":"round","stroke-linejoin":"round","class":"drawn"});
-    g.appendChild(line);
-    requestAnimationFrame(function(){ try{ line.style.setProperty("--len", line.getTotalLength()); }catch(e){} });
-
-    rate.forEach(function(v,i){
-      var c=el("circle",{cx:X(i),cy:Y(v),r:(i===6?6:4.5),fill:(i===6?"#ff6b7a":"#5fd3c4"),stroke:"#0b0e14","stroke-width":2,"class":"dotfade"});
-      g.appendChild(c);
-      if(i===6||i===9||i===5){
-        var t=txt(X(i),Y(v)+(i===6?24:-16),v.toFixed(1)+"%","dotfade ax");
-        t.setAttribute("fill",i===6?"#ff6b7a":"#e8ecf5");
-        t.setAttribute("font-size","14"); t.setAttribute("font-weight","600");
-        g.appendChild(t);
-      }
-    });
-  })();
-
-  /* ---------- chart 2: redistribution ---------- */
-  (function(){
-    var g=document.getElementById("c2");
-    var W=980,H=380,L=52,R=128,T=20,B=42;
-    var pw=W-L-R, ph=H-T-B;
-    var yMax=22;
-    var X=function(i){return L+(pw*i)/(weeks.length-1);};
-    var Y=function(v){return T+ph-(v/yMax)*ph;};
-
-    for(var v=0;v<=20;v+=5){
-      g.appendChild(el("line",{x1:L,y1:Y(v),x2:W-R,y2:Y(v),"class":"gl"}));
-      g.appendChild(txt(L-12,Y(v)+4,v,"ax","end"));
-    }
-    var yl=txt(0,0,"offers sent / week","ax","middle");
-    yl.setAttribute("transform","translate(16,"+(T+ph/2)+") rotate(-90)");
-    g.appendChild(yl);
-    weeks.forEach(function(w,i){ g.appendChild(txt(X(i),H-14,w)); });
-
-    var rx=(X(5)+X(6))/2;
-    g.appendChild(el("rect",{x:rx,y:T,width:(W-R)-rx,height:ph,fill:"#ff6b7a","fill-opacity":".035"}));
-    g.appendChild(el("line",{x1:rx,y1:T-4,x2:rx,y2:T+ph,stroke:"#ff6b7a","stroke-width":1.5,"stroke-dasharray":"5 5"}));
-    var rl=txt(rx+8,T+12,"4.2 ships","ax","start"); rl.setAttribute("fill","#ff6b7a"); g.appendChild(rl);
-
-    var style={win:{c:"#7ee08f",w:2.4,o:1},lose:{c:"#ff6b7a",w:2.6,o:1},mid:{c:"#67738d",w:1.2,o:.42}};
-    var lines=[];
-    ["mid","win","lose"].forEach(function(grp){
-      series.filter(function(s){return s.g===grp;}).forEach(function(s){
-        var st=style[grp];
-        var pts=s.v.map(function(v,i){return [X(i),Y(v)];});
-        var p=el("path",{d:path(pts),fill:"none",stroke:st.c,"stroke-width":st.w,"stroke-opacity":st.o,
-                         "stroke-linecap":"round","stroke-linejoin":"round","class":"drawn"});
-        g.appendChild(p); lines.push(p);
-
-        if(grp!=="mid"){
-          var last=s.v[9];
-          var lbl=txt(X(9)+10,Y(last)+4,s.n+"  "+last,"dotfade ax","start");
-          lbl.setAttribute("fill",st.c); lbl.setAttribute("font-size","12");
-          lbl.setAttribute("font-weight","600");
-          g.appendChild(lbl);
-          g.appendChild(el("circle",{cx:X(9),cy:Y(last),r:3.5,fill:st.c,"class":"dotfade"}));
-        }
-      });
-    });
-    requestAnimationFrame(function(){
-      lines.forEach(function(p){ try{ p.style.setProperty("--len", p.getTotalLength()); }catch(e){} });
-    });
-
-    /* nudge overlapping end-labels apart, then keep them inside the plot */
-    requestAnimationFrame(function(){
-      var GAP=13, top=T+8, bottom=T+ph+2, i;
-      var labels=Array.prototype.slice.call(g.querySelectorAll("text.dotfade"));
-      labels.sort(function(a,b){return (+a.getAttribute("y"))-(+b.getAttribute("y"));});
-      for(i=1;i<labels.length;i++){
-        var prev=+labels[i-1].getAttribute("y");
-        if((+labels[i].getAttribute("y"))-prev<GAP) labels[i].setAttribute("y",prev+GAP);
-      }
-      for(i=labels.length-1;i>=0;i--){
-        var y=Math.min(+labels[i].getAttribute("y"), bottom-(labels.length-1-i)*GAP);
-        labels[i].setAttribute("y", Math.max(y, top+i*GAP));
-      }
-    });
-  })();
-
-  /* ---------- reveal on scroll ---------- */
-  var io=new IntersectionObserver(function(es){
-    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
-  },{threshold:.12,rootMargin:"0px 0px -8% 0px"});
-  var rvs=document.querySelectorAll(".rv");
-  for(var i=0;i<rvs.length;i++){
-    rvs[i].style.transitionDelay=(Math.min(i%5,4)*70)+"ms";
-    io.observe(rvs[i]);
-  }
-
-  /* ---------- nav ---------- */
-  var slides=Array.prototype.slice.call(document.querySelectorAll(".slide"));
-  var rail=document.getElementById("rail");
-  slides.forEach(function(s,i){
-    var b=document.createElement("button");
-    b.title=(i+1)+" · "+(s.dataset.nav||"");
-    b.setAttribute("aria-label","Go to slide "+(i+1)+": "+(s.dataset.nav||""));
-    b.onclick=function(){ s.scrollIntoView({behavior:"smooth"}); };
-    rail.appendChild(b);
+  [0,5,10,15,20].forEach(function(g){
+    svg.appendChild(el("line",{x1:L,x2:L+pw,y1:y(g),y2:y(g),stroke:"#232b3d","stroke-width":1}));
+    var t=el("text",{x:L-9,y:y(g)+4,"text-anchor":"end"}); t.textContent=g; svg.appendChild(t);
   });
-  var dots=rail.querySelectorAll("button");
-  var bar=document.getElementById("progress");
+  svg.appendChild(el("rect",{x:x(6)-((pw/9)/2),y:T,width:pw/9,height:ph,fill:"#ff6b7a",opacity:".07"}));
+  svg.appendChild(el("line",{x1:x(6),x2:x(6),y1:T,y2:T+ph,stroke:"#ff6b7a","stroke-width":1.5,"stroke-dasharray":"4 4",opacity:".75"}));
+  var rl=el("text",{x:x(6)+8,y:T+13,fill:"#ff6b7a"}); rl.textContent="4.2"; svg.appendChild(rl);
 
-  function current(){
-    var best=0,bd=Infinity;
-    slides.forEach(function(s,i){
-      var d=Math.abs(s.getBoundingClientRect().top);
-      if(d<bd){bd=d;best=i;}
-    });
-    return best;
-  }
-  function sync(){
-    var c=current();
-    for(var i=0;i<dots.length;i++) dots[i].classList.toggle("on",i===c);
-    var h=document.documentElement;
-    var max=h.scrollHeight-h.clientHeight;
-    bar.style.width=(max>0?(h.scrollTop/max)*100:0)+"%";
-  }
-  var tick=false;
-  window.addEventListener("scroll",function(){
-    if(!tick){ tick=true; requestAnimationFrame(function(){ sync(); tick=false; }); }
-  },{passive:true});
-  sync();
-
-  document.addEventListener("keydown",function(e){
-    if(/^(INPUT|TEXTAREA|IFRAME)$/.test(document.activeElement.tagName)) return;
-    var c=current(), t=null;
-    if(e.key==="ArrowDown"||e.key==="PageDown"||e.key===" ") t=Math.min(c+1,slides.length-1);
-    else if(e.key==="ArrowUp"||e.key==="PageUp") t=Math.max(c-1,0);
-    else if(e.key==="Home") t=0;
-    else if(e.key==="End") t=slides.length-1;
-    else if(/^[1-9]$/.test(e.key)) t=Math.min(parseInt(e.key,10)-1,slides.length-1);
-    if(t!==null){ e.preventDefault(); slides[t].scrollIntoView({behavior:"smooth"}); }
+  var labels=[];
+  series.forEach(function(s){
+    var d = s.v.map(function(v,i){ return (i?"L":"M")+x(i)+" "+y(v); }).join(" ");
+    var p = el("path",{d:d,fill:"none",stroke:s.c,"stroke-width":2.1,"stroke-linejoin":"round","stroke-linecap":"round",opacity:".92"});
+    svg.appendChild(p); trace(p);
+    svg.appendChild(el("circle",{cx:x(9),cy:y(s.v[9]),r:3,fill:s.c}));
+    var t=el("text",{x:L+pw+10,y:y(s.v[9])+3.5,fill:s.c}); t.setAttribute("class","lbl");
+    t.textContent=s.n; svg.appendChild(t); labels.push(t);
   });
 
-  setTimeout(function(){
-    var h=document.getElementById("hint");
-    if(h){ h.style.transition="opacity .8s"; h.style.opacity="0"; }
-  },7000);
+  /* two-pass de-collision, clamped inside the plot */
+  var GAP=13, top=T+8, bottom=T+ph+2, i;
+  labels.sort(function(a,b){ return (+a.getAttribute("y")) - (+b.getAttribute("y")); });
+  for(i=1;i<labels.length;i++){
+    var prev=+labels[i-1].getAttribute("y"), cur=+labels[i].getAttribute("y");
+    if(cur-prev < GAP) labels[i].setAttribute("y", prev+GAP);
+  }
+  for(i=labels.length-1;i>=0;i--){
+    var yy = Math.min(+labels[i].getAttribute("y"), bottom-(labels.length-1-i)*GAP);
+    labels[i].setAttribute("y", Math.max(yy, top+i*GAP));
+  }
+
+  [0,2,4,6,8,9].forEach(function(i){
+    var w=el("text",{x:x(i),y:H-14,"text-anchor":"middle"}); w.textContent=WEEKS[i]; svg.appendChild(w);
+  });
+})();
+
+/* ---------- the trap simulator ---------- */
+(function(){
+  var CREDIT=0.08, PENALTY=0.12, NEUTRAL=0.5;
+  var score=NEUTRAL, misses=0, takes=0;
+  var sScore=document.getElementById("sScore"), sBar=document.getElementById("sBar"),
+      sOffers=document.getElementById("sOffers"), sPips=document.getElementById("sPips"),
+      log=document.getElementById("simlog"),
+      bMiss=document.getElementById("bMiss"), bTake=document.getElementById("bTake"),
+      bReset=document.getElementById("bReset");
+
+  function offersFor(s){ return Math.max(0, Math.round(30*s - 3)); }
+
+  function paint(msg, tone){
+    var o = offersFor(score);
+    sScore.textContent = score.toFixed(2);
+    sScore.style.color = score < .25 ? "var(--bad)" : (score < .45 ? "var(--warn)" : "var(--good)");
+    sBar.style.width = (score*100)+"%";
+    sOffers.textContent = o;
+    sOffers.style.color = o===0 ? "var(--bad)" : (o<5 ? "var(--warn)" : "var(--ink)");
+    sPips.innerHTML="";
+    for(var i=0;i<o;i++){ var p=document.createElement("i");
+      p.style.background = o<5 ? "var(--warn)" : "var(--accent)";
+      p.style.animationDelay=(i*18)+"ms"; sPips.appendChild(p); }
+    log.textContent = msg;
+    log.className = tone || "";
+    bTake.disabled = (o===0);
+    bMiss.disabled = (o===0);
+    bTake.textContent = o===0 ? "Nothing to accept" : "Accept one";
+  }
+
+  bMiss.addEventListener("click", function(){
+    misses++;
+    score = Math.max(0, +(score - PENALTY).toFixed(4));
+    var o = offersFor(score);
+    if(o===0){
+      paint("Standing "+score.toFixed(2)+". No offers are coming.\nThe only way up is accepting one. There is nothing to accept.", "bad");
+    } else if(o<5){
+      paint("Missed "+misses+". Standing "+score.toFixed(2)+", down to "+o+(o===1?" offer":" offers")+" a week.\nYou'd need "+Math.ceil((NEUTRAL-score)/CREDIT)+" accepts to reach neutral — and "+o+(o===1?" chance":" chances")+" to try.", "bad");
+    } else {
+      paint("Missed "+misses+". Standing "+score.toFixed(2)+". A phone you didn't reach in 60 seconds costs the same as a refusal.", "bad");
+    }
+  });
+
+  bTake.addEventListener("click", function(){
+    takes++;
+    score = Math.min(1, +(score + CREDIT).toFixed(4));
+    paint("Accepted "+takes+". Standing "+score.toFixed(2)+".\n+0.08 up against −0.12 down — one miss costs one and a half accepts.", "good");
+  });
+
+  bReset.addEventListener("click", function(){
+    score=NEUTRAL; misses=0; takes=0;
+    paint("Neutral standing. Phone rings about twice a day.", "");
+  });
+
+  paint("Neutral standing. Phone rings about twice a day.", "");
+})();
+
+/* ---------- embed + drive the prototype ---------- */
+(function(){
+  var holder = document.getElementById("proto-src");
+  var frame  = document.getElementById("proto");
+  if(!holder || !frame) return;
+  var b64 = holder.textContent.trim(), html;
+  try{
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    html = new TextDecoder("utf-8").decode(bytes);
+  }catch(err){
+    frame.srcdoc = '<body style="font:15px -apple-system,sans-serif;color:#555;padding:28px">' +
+      'Prototype not inlined. Open <code>05-super-speed/prototype.html</code> directly.</body>';
+    return;
+  }
+  frame.srcdoc = html;
+
+  var btns = Array.prototype.slice.call(document.querySelectorAll("#drive button"));
+  function drive(v){
+    try{
+      var doc = frame.contentDocument;
+      if(!doc) return;
+      var t = doc.querySelector('nav button[data-v="'+v+'"]');
+      if(t){ t.click(); frame.contentWindow.scrollTo(0,0); }
+    }catch(e){/* cross-origin when opened via file:// in some browsers */}
+  }
+  btns.forEach(function(b){
+    b.addEventListener("click", function(){
+      btns.forEach(function(o){ o.classList.remove("on"); });
+      b.classList.add("on");
+      drive(b.getAttribute("data-v"));
+    });
+  });
+})();
+
 })();
 </script>
 </body>
