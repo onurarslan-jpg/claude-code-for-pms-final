@@ -825,17 +825,29 @@ var WEEKS = ["29 Jun","6 Jul","13 Jul","20 Jul","27 Jul","3 Aug","10 Aug","17 Au
       'Prototype not inlined. Open <code>05-super-speed/prototype.html</code> directly.</body>';
     return;
   }
+  /* A srcdoc iframe can land on an opaque origin (notably file:// in Chrome),
+     which blocks contentDocument. postMessage works either way, so inject a
+     tiny listener and talk to the frame instead of reaching into it. */
+  var bridge = "<scr"+"ipt>(function(){window.addEventListener('message',function(e){"+
+    "var d=e.data; if(!d||d.t!=='view')return;"+
+    "var b=document.querySelector('nav button[data-v=\"'+d.v+'\"]');"+
+    "if(b){b.click();window.scrollTo(0,0);}});})();</scr"+"ipt>";
+  html = html.indexOf("</body>") !== -1
+       ? html.replace("</body>", bridge+"</body>")
+       : html + bridge;
+
+  var ready = false, pending = null;
+  frame.addEventListener("load", function(){
+    ready = true;
+    if(pending){ send(pending); pending = null; }
+  });
   frame.srcdoc = html;
 
-  var btns = Array.prototype.slice.call(document.querySelectorAll("#drive button"));
-  function drive(v){
-    try{
-      var doc = frame.contentDocument;
-      if(!doc) return;
-      var t = doc.querySelector('nav button[data-v="'+v+'"]');
-      if(t){ t.click(); frame.contentWindow.scrollTo(0,0); }
-    }catch(e){/* cross-origin when opened via file:// in some browsers */}
+  function send(v){
+    if(frame.contentWindow) frame.contentWindow.postMessage({t:"view", v:v}, "*");
   }
+  var btns = Array.prototype.slice.call(document.querySelectorAll("#drive button"));
+  function drive(v){ if(ready) send(v); else pending = v; }
   btns.forEach(function(b){
     b.addEventListener("click", function(){
       btns.forEach(function(o){ o.classList.remove("on"); });
